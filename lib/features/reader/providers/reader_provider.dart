@@ -568,18 +568,11 @@ class ReaderDataNotifier extends StateNotifier<ReaderDataState> {
         <String, Map<int, Map<int, List<TranslationRemark>>>>{};
     await Future.wait(
       enabledLangs.map((langCode) async {
-        final settings = _ref.read(settingsProvider);
-        final versionSuffix = settings.translationVersionMap[langCode];
-        final isNissaya =
-            versionSuffix != null &&
-            TranslationFilenameParser.isNissaya(versionSuffix);
+        final isNissaya = TranslationFilenameParser.isNissaya(langCode);
 
         if (isNissaya) {
           // ── Load from nissaya database ────────────────────────────
-          final filename = TranslationFilenameParser.build(
-            langCode,
-            suffix: versionSuffix,
-          );
+          final filename = TranslationFilenameParser.build(langCode);
           final nissayaDb = await _ref.read(
             nissayaDbByFilenameProvider(filename).future,
           );
@@ -808,11 +801,7 @@ class ReaderDataNotifier extends StateNotifier<ReaderDataState> {
   /// paragraphs' remarks in place (no full book reload), so the remark
   /// editor's saved edits show up as soon as the dialog closes.
   Future<void> refreshRemarks(String langCode) async {
-    final settings = _ref.read(settingsProvider);
-    final versionSuffix = settings.translationVersionMap[langCode];
-    final isNissaya =
-        versionSuffix != null &&
-        TranslationFilenameParser.isNissaya(versionSuffix);
+    final isNissaya = TranslationFilenameParser.isNissaya(langCode);
     if (isNissaya) return; // Nissaya DBs have no remarks table.
 
     final translationDb = await _ref.read(

@@ -65,10 +65,15 @@
           "updated": "2026-08-29",
           "compulsory": false,
           "checksum": "c27f6a816f0ecab2e7800170d386797bc219d7eaca1d66a7c8f968d5c5ed63c5"
-        },
-        "nissaya": {
-          "displayName": "Nissaya",
-          "suffix": "nissaya",
+        }
+      }
+    },
+    "my_nissaya": {
+      "englishName": "Myanmar Nissaya",
+      "nativeName": "မြန်မာနိဿယ",
+      "versions": {
+        "default": {
+          "displayName": "Default",
           "url": "https://github.com/dhammanana/epitaka_app/releases/download/latest/epitaka_my_nissaya.zip",
           "size": 97759779,
           "dbSize": 649498624,

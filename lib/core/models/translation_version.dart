@@ -126,7 +126,9 @@ class TranslationVersion {
     Map<String, dynamic> json,
   ) {
     final suffix = json['suffix'] as String? ?? '';
-    final isNissaya = json['type'] == 'nissaya';
+    final isNissaya = json['type'] == 'nissaya' ||
+        TranslationFilenameParser.isNissaya(languageCode) ||
+        TranslationFilenameParser.isNissaya(suffix);
     final filename = suffix.isNotEmpty
         ? 'epitaka_${languageCode}_$suffix.db'
         : 'epitaka_$languageCode.db';
@@ -352,7 +354,7 @@ class TranslationManifest {
 ///
 /// Format: `epitaka_<code>[_<suffix>].db`
 class TranslationFilenameParser {
-  static const _pattern = r'^epitaka_([a-z]{2})(?:_(.+))?\.db$';
+  static const _pattern = r'^epitaka_([a-z]{2}(?:_nissaya)?)(?:_(.+))?\.db$';
 
   /// Parse a filename and return (languageCode, suffixOrNull).
   static (String, String?) parse(String filename) {
@@ -367,9 +369,9 @@ class TranslationFilenameParser {
   /// Check if a filename matches the epitaka DB pattern.
   static bool matches(String filename) => RegExp(_pattern).hasMatch(filename);
 
-  /// Check if a suffix indicates a nissaya database.
-  static bool isNissaya(String? suffix) =>
-      suffix != null && suffix.contains('nissaya');
+  /// Check if a code or suffix indicates a nissaya database.
+  static bool isNissaya(String? codeOrSuffix) =>
+      codeOrSuffix != null && codeOrSuffix.contains('nissaya');
 
   /// Build filename from language code and optional suffix.
   static String build(String code, {String? suffix}) =>
@@ -396,7 +398,7 @@ class TranslationFilenameParser {
             languageCode: code,
             suffix: suffix,
             filename: filename,
-            isNissaya: isNissaya(suffix),
+            isNissaya: isNissaya(code) || isNissaya(suffix),
             isAvailable: true,
             displayName: suffix ?? 'Default',
           ),

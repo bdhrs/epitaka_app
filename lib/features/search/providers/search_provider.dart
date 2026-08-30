@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/database/app_database.dart';
 import '../../../core/database/epitaka_database.dart';
 import '../../../core/models/app_models.dart';
+import '../../../core/models/translation_version.dart';
 import '../../../core/providers/app_db_provider.dart';
 import '../../../core/providers/database_provider.dart';
 import '../../../core/providers/settings_provider.dart';
@@ -612,24 +613,43 @@ class SearchNotifier extends StateNotifier<SearchState> {
       final transLineMap = <int, Map<int, String>>{};
       if (activeLang != null) {
         try {
-          final transDb = await _ref.read(translationDbProvider(activeLang).future);
-          if (transDb != null) {
-            final tRows = await transDb.customSelect(
-              'SELECT para_id, line_id, translation '
-              'FROM sentences '
-              'WHERE book_id = ? AND para_id IN ($placeholders) '
-              'ORDER BY para_id, line_id',
-              variables: [
-                Variable.withString(summary.book.bookId),
-                ...matchingParaIds.map((id) => Variable.withInt(id)),
-              ],
-            ).get();
-            for (final row in tRows) {
-              final pid = row.data['para_id'] as int;
-              final lid = row.data['line_id'] as int;
-              final t = row.data['translation'] as String?;
-              if (t != null && t.isNotEmpty) {
-                transLineMap.putIfAbsent(pid, () => {})[lid] = t;
+          if (TranslationFilenameParser.isNissaya(activeLang)) {
+            final filename = TranslationFilenameParser.build(activeLang);
+            final nissayaDb =
+                await _ref.read(nissayaDbByFilenameProvider(filename).future);
+            if (nissayaDb != null) {
+              for (final pid in matchingParaIds) {
+                final sentences =
+                    await nissayaDb.getSentences(summary.book.bookId, pid);
+                for (final s in sentences) {
+                  final t = s.formattedText;
+                  if (t.isNotEmpty) {
+                    transLineMap.putIfAbsent(pid, () => {})[s.lineId] = t;
+                  }
+                }
+              }
+            }
+          } else {
+            final transDb =
+                await _ref.read(translationDbProvider(activeLang).future);
+            if (transDb != null) {
+              final tRows = await transDb.customSelect(
+                'SELECT para_id, line_id, translation '
+                'FROM sentences '
+                'WHERE book_id = ? AND para_id IN ($placeholders) '
+                'ORDER BY para_id, line_id',
+                variables: [
+                  Variable.withString(summary.book.bookId),
+                  ...matchingParaIds.map((id) => Variable.withInt(id)),
+                ],
+              ).get();
+              for (final row in tRows) {
+                final pid = row.data['para_id'] as int;
+                final lid = row.data['line_id'] as int;
+                final t = row.data['translation'] as String?;
+                if (t != null && t.isNotEmpty) {
+                  transLineMap.putIfAbsent(pid, () => {})[lid] = t;
+                }
               }
             }
           }
@@ -880,23 +900,39 @@ class SearchNotifier extends StateNotifier<SearchState> {
       final transLineMap = <int, String>{};
       if (activeLang != null) {
         try {
-          final transDb =
-              await _ref.read(translationDbProvider(activeLang).future);
-          if (transDb != null) {
-            final tRows = await transDb.customSelect(
-              'SELECT line_id, translation '
-              'FROM sentences '
-              'WHERE book_id = ? AND para_id = ? '
-              'ORDER BY line_id',
-              variables: [
-                Variable.withString(ref.bookId),
-                Variable.withInt(ref.paraId),
-              ],
-            ).get();
-            for (final row in tRows) {
-              final t = row.data['translation'] as String?;
-              if (t != null && t.isNotEmpty) {
-                transLineMap[row.data['line_id'] as int] = t;
+          if (TranslationFilenameParser.isNissaya(activeLang)) {
+            final filename = TranslationFilenameParser.build(activeLang);
+            final nissayaDb =
+                await _ref.read(nissayaDbByFilenameProvider(filename).future);
+            if (nissayaDb != null) {
+              final sentences =
+                  await nissayaDb.getSentences(ref.bookId, ref.paraId);
+              for (final s in sentences) {
+                final t = s.formattedText;
+                if (t.isNotEmpty) {
+                  transLineMap[s.lineId] = t;
+                }
+              }
+            }
+          } else {
+            final transDb =
+                await _ref.read(translationDbProvider(activeLang).future);
+            if (transDb != null) {
+              final tRows = await transDb.customSelect(
+                'SELECT line_id, translation '
+                'FROM sentences '
+                'WHERE book_id = ? AND para_id = ? '
+                'ORDER BY line_id',
+                variables: [
+                  Variable.withString(ref.bookId),
+                  Variable.withInt(ref.paraId),
+                ],
+              ).get();
+              for (final row in tRows) {
+                final t = row.data['translation'] as String?;
+                if (t != null && t.isNotEmpty) {
+                  transLineMap[row.data['line_id'] as int] = t;
+                }
               }
             }
           }

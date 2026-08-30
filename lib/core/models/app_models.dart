@@ -98,6 +98,7 @@ enum TranslationLanguage {
   thai('th', 'ไทย', 'Thai'),
   sinhala('si', 'සිංහල', 'Sinhala'),
   myanmar('my', 'မြန်မာ', 'Myanmar'),
+  myanmarNissaya('my_nissaya', 'မြန်မာနိဿယ', 'Myanmar Nissaya'),
   english('en', 'English', 'English');
 
   final String code;

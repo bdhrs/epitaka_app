@@ -858,7 +858,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     if (raw == null || raw.isEmpty) return const {};
     try {
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      return decoded.map((k, v) => MapEntry(k, v as String));
+      final map = decoded.map((k, v) => MapEntry(k, v as String));
+      if (map['my'] == 'nissaya') {
+        map.remove('my');
+        prefs.setString('translation_version_map', jsonEncode(map));
+      }
+      return map;
     } catch (_) {
       return const {};
     }

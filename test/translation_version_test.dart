@@ -17,10 +17,18 @@ void main() {
 
     test('parses suffixed filename', () {
       final (code, suffix) = TranslationFilenameParser.parse(
+        'epitaka_si_v2.db',
+      );
+      expect(code, 'si');
+      expect(suffix, 'v2');
+    });
+
+    test('parses my_nissaya filename as its own language code', () {
+      final (code, suffix) = TranslationFilenameParser.parse(
         'epitaka_my_nissaya.db',
       );
-      expect(code, 'my');
-      expect(suffix, 'nissaya');
+      expect(code, 'my_nissaya');
+      expect(suffix, isNull);
     });
 
     test('matches valid filenames', () {
@@ -51,8 +59,12 @@ void main() {
     test('builds filename correctly', () {
       expect(TranslationFilenameParser.build('en'), 'epitaka_en.db');
       expect(
-        TranslationFilenameParser.build('my', suffix: 'nissaya'),
+        TranslationFilenameParser.build('my_nissaya'),
         'epitaka_my_nissaya.db',
+      );
+      expect(
+        TranslationFilenameParser.build('my'),
+        'epitaka_my.db',
       );
       expect(
         TranslationFilenameParser.build('th', suffix: 'v2'),
@@ -64,6 +76,7 @@ void main() {
       final dir = Directory.systemTemp.createTempSync('epitaka_test');
       try {
         File(p.join(dir.path, 'epitaka_en.db')).createSync();
+        File(p.join(dir.path, 'epitaka_my.db')).createSync();
         File(p.join(dir.path, 'epitaka_my_nissaya.db')).createSync();
         File(p.join(dir.path, 'epitaka_th.db')).createSync();
         File(p.join(dir.path, 'epitaka.db')).createSync();
@@ -72,7 +85,7 @@ void main() {
 
         final versions = TranslationFilenameParser.scanDirectory(dir);
 
-        expect(versions.length, 3);
+        expect(versions.length, 4);
 
         final en = versions.firstWhere((v) => v.languageCode == 'en');
         expect(en.suffix, isNull);
@@ -80,12 +93,19 @@ void main() {
         expect(en.isAvailable, isTrue);
         expect(en.filename, 'epitaka_en.db');
 
-        final my = versions.firstWhere(
-          (v) => v.languageCode == 'my' && v.suffix == 'nissaya',
-        );
-        expect(my.isNissaya, isTrue);
+        final my = versions.firstWhere((v) => v.languageCode == 'my');
+        expect(my.suffix, isNull);
+        expect(my.isNissaya, isFalse);
         expect(my.isAvailable, isTrue);
-        expect(my.filename, 'epitaka_my_nissaya.db');
+        expect(my.filename, 'epitaka_my.db');
+
+        final myNissaya = versions.firstWhere(
+          (v) => v.languageCode == 'my_nissaya',
+        );
+        expect(myNissaya.suffix, isNull);
+        expect(myNissaya.isNissaya, isTrue);
+        expect(myNissaya.isAvailable, isTrue);
+        expect(myNissaya.filename, 'epitaka_my_nissaya.db');
 
         final th = versions.firstWhere((v) => v.languageCode == 'th');
         expect(th.isNissaya, isFalse);
@@ -98,12 +118,11 @@ void main() {
   group('TranslationVersion model', () {
     test('copyWith preserves fields', () {
       final v = TranslationVersion(
-        languageCode: 'my',
-        suffix: 'nissaya',
+        languageCode: 'my_nissaya',
         filename: 'epitaka_my_nissaya.db',
         isNissaya: true,
         isAvailable: true,
-        displayName: 'Nissaya',
+        displayName: 'Default',
         downloadUrl: 'https://example.com/epitaka_my_nissaya.db.zip',
         fileSize: 649498624,
         updatedAt: '2026-07-16',
@@ -111,8 +130,8 @@ void main() {
       );
 
       final copy = v.copyWith(isAvailable: false, clearDownloadUrl: true);
-      expect(copy.languageCode, 'my');
-      expect(copy.suffix, 'nissaya');
+      expect(copy.languageCode, 'my_nissaya');
+      expect(copy.suffix, isNull);
       expect(copy.isNissaya, isTrue);
       expect(copy.isAvailable, isFalse);
       expect(copy.downloadUrl, isNull);
@@ -124,11 +143,10 @@ void main() {
 
     test('toJson produces correct format', () {
       final v = TranslationVersion(
-        languageCode: 'my',
-        suffix: 'nissaya',
+        languageCode: 'my_nissaya',
         filename: 'epitaka_my_nissaya.db',
         isNissaya: true,
-        displayName: 'Nissaya',
+        displayName: 'Default',
         downloadUrl: 'https://example.com/db.zip',
         fileSize: 1000,
         updatedAt: '2026-07-16',
@@ -136,8 +154,7 @@ void main() {
       );
 
       final json = v.toJson();
-      expect(json['displayName'], 'Nissaya');
-      expect(json['suffix'], 'nissaya');
+      expect(json['displayName'], 'Default');
       expect(json['url'], 'https://example.com/db.zip');
       expect(json['size'], 1000);
       expect(json['type'], 'nissaya');
@@ -146,9 +163,8 @@ void main() {
     });
 
     test('fromJson parses correctly', () {
-      final v = TranslationVersion.fromJson('my', {
-        'displayName': 'Nissaya',
-        'suffix': 'nissaya',
+      final v = TranslationVersion.fromJson('my_nissaya', {
+        'displayName': 'Default',
         'url': 'https://example.com/db.zip',
         'size': 1000,
         'dbSize': 244117504,
@@ -157,8 +173,8 @@ void main() {
         'checksum': 'abc',
       });
 
-      expect(v.languageCode, 'my');
-      expect(v.suffix, 'nissaya');
+      expect(v.languageCode, 'my_nissaya');
+      expect(v.suffix, isNull);
       expect(v.isNissaya, isTrue);
       expect(v.filename, 'epitaka_my_nissaya.db');
       expect(v.downloadUrl, 'https://example.com/db.zip');
@@ -241,21 +257,20 @@ void main() {
       expect(v.displayName, 'Default');
 
       final v2 = TranslationVersion.fromJson('my', {
-        'suffix': 'nissaya',
+        'suffix': 'v2',
         'url': 'https://example.com/db.zip',
       });
-      expect(v2.displayName, 'nissaya');
+      expect(v2.displayName, 'v2');
     });
 
     test('englishName and nativeName via TranslationLanguageRegistry', () {
-      // The registry is manifest-driven, so names only resolve after the
-      // manifest is registered.
       TranslationLanguageRegistry.registerFromManifest(
         TranslationManifest.fromString('''{
           "version": 1,
           "languages": {
             "en": {"englishName": "English", "nativeName": "English", "versions": {}},
-            "my": {"englishName": "Myanmar", "nativeName": "မြန်မာ", "versions": {}}
+            "my": {"englishName": "Myanmar", "nativeName": "မြန်မာ", "versions": {}},
+            "my_nissaya": {"englishName": "Myanmar Nissaya", "nativeName": "မြန်မာနိဿယ", "versions": {}}
           }
         }'''),
       );
@@ -273,6 +288,13 @@ void main() {
       );
       expect(my.englishName, 'Myanmar');
       expect(my.nativeName, 'မြန်မာ');
+
+      final myNissaya = TranslationVersion(
+        languageCode: 'my_nissaya',
+        filename: 'epitaka_my_nissaya.db',
+      );
+      expect(myNissaya.englishName, 'Myanmar Nissaya');
+      expect(myNissaya.nativeName, 'မြန်မာနိဿယ');
     });
   });
 
@@ -290,9 +312,14 @@ void main() {
                 'url': 'https://github.com/example/epitaka_my.db.zip',
                 'size': 1000000,
               },
-              'nissaya': {
-                'displayName': 'Nissaya',
-                'suffix': 'nissaya',
+            },
+          },
+          'my_nissaya': {
+            'englishName': 'Myanmar Nissaya',
+            'nativeName': 'မြန်မာနိဿယ',
+            'versions': {
+              'default': {
+                'displayName': 'Default',
                 'url': 'https://github.com/example/epitaka_my_nissaya.db.zip',
                 'size': 2000000,
                 'type': 'nissaya',
@@ -312,18 +339,18 @@ void main() {
 
       final manifest = TranslationManifest.fromJson(json);
       expect(manifest.version, 1);
-      expect(manifest.languages.length, 2);
+      expect(manifest.languages.length, 3);
 
       final myVersions = manifest.versionsFor('my');
-      expect(myVersions.length, 2);
+      expect(myVersions.length, 1);
 
       final defaultVersion = myVersions.firstWhere((v) => v.suffix == null);
       expect(defaultVersion.isNissaya, isFalse);
       expect(defaultVersion.fileSize, 1000000);
 
-      final nissayaVersion = myVersions.firstWhere(
-        (v) => v.suffix == 'nissaya',
-      );
+      final myNissayaVersions = manifest.versionsFor('my_nissaya');
+      expect(myNissayaVersions.length, 1);
+      final nissayaVersion = myNissayaVersions.first;
       expect(nissayaVersion.isNissaya, isTrue);
       expect(nissayaVersion.fileSize, 2000000);
 
@@ -334,6 +361,8 @@ void main() {
         'https://github.com/example/epitaka_en.db.zip',
       );
     });
+
+
 
     test('parses from string', () {
       final raw = jsonEncode({
@@ -364,21 +393,22 @@ void main() {
 
   group('TranslationLanguageRegistry', () {
     test('returns names registered from the manifest', () {
-      // The registry is now manifest-driven (no hardcoded list), so names
-      // only resolve after registration from a manifest.
       TranslationLanguageRegistry.registerFromManifest(
         TranslationManifest.fromString('''{
           "version": 1,
           "languages": {
             "en": {"englishName": "English", "nativeName": "English", "versions": {}},
             "th": {"englishName": "Thai", "nativeName": "ไทย", "versions": {}},
-            "my": {"englishName": "Myanmar", "nativeName": "မြန်မာ", "versions": {}}
+            "my": {"englishName": "Myanmar", "nativeName": "မြန်မာ", "versions": {}},
+            "my_nissaya": {"englishName": "Myanmar Nissaya", "nativeName": "မြန်မာနိဿယ", "versions": {}}
           }
         }'''),
       );
       expect(TranslationLanguageRegistry.englishName('en'), 'English');
       expect(TranslationLanguageRegistry.nativeName('th'), 'ไทย');
       expect(TranslationLanguageRegistry.englishName('my'), 'Myanmar');
+      expect(TranslationLanguageRegistry.englishName('my_nissaya'), 'Myanmar Nissaya');
+      expect(TranslationLanguageRegistry.nativeName('my_nissaya'), 'မြန်မာနိဿယ');
     });
 
     test('falls back to code for unknown/unregistered codes', () {
