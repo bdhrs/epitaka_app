@@ -342,17 +342,9 @@ class _TranslationSettingsBodyState
                                       .where((v) => v.isAvailable)
                                       .toList();
                                   if (available.isNotEmpty) {
-                                    // Prefer nissaya versions when auto-
-                                    // selecting — users who have installed a
-                                    // nissaya DB are most likely trying to
-                                    // use that specific version.
-                                    final best = available.firstWhere(
-                                      (v) => v.isNissaya,
-                                      orElse: () => available.first,
-                                    );
                                     notifier.setTranslationVersion(
                                       code,
-                                      best.suffix,
+                                      available.first.suffix,
                                     );
                                   }
                                 }
@@ -932,12 +924,14 @@ class _TranslationVersionTileState extends State<_TranslationVersionTile> {
                 ),
                 child: const Icon(Icons.check, size: 14, color: Colors.green),
               )
-            else if (isInstalled && v.isNissaya)
-              _StatusChip(label: loc.nissaya, color: Colors.teal, colors: colors)
             else if (isInstalled)
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (v.isNissaya) ...[
+                    _StatusChip(label: loc.nissaya, color: Colors.teal, colors: colors),
+                    const SizedBox(width: 6),
+                  ],
                   if (_hasUpdate && v.hasDownloadUrl)
                     _SmallButton(
                       label: loc.update,

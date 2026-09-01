@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../models/translation_version.dart';
 import '../utils/pali_stemmer.dart';
 import 'database_provider.dart';
 import 'settings_provider.dart';
@@ -198,28 +199,46 @@ final paliDefinitionProvider = FutureProvider.autoDispose
         // actually provides a translation for each line.
         final translationByLine = <String, String>{};
         for (final code in langCodes) {
-          final transDb = await ref.read(
-            translationDbProvider(code).future,
-          );
-          if (transDb == null) continue;
-          final transRows = await transDb
-              .customSelect(
-                'SELECT para_id, line_id, translation FROM sentences '
-                'WHERE book_id = ? AND para_id IN (${paraIds.map((_) => '?').join(',')})',
-                variables: [
-                  Variable.withString(bookId),
-                  for (final p in paraIds) Variable.withInt(p),
-                ],
-              )
-              .get();
-          for (final r in transRows) {
-            final pid = r.data['para_id'] as int;
-            final lid = r.data['line_id'] as int;
-            final text = (r.data['translation'] as String?) ?? '';
-            if (text.trim().isEmpty) continue;
-            final key = '$pid:$lid';
-            // Keep the first (highest-priority) language's translation.
-            translationByLine.putIfAbsent(key, () => text);
+          if (TranslationFilenameParser.isNissaya(code)) {
+            final filename = TranslationFilenameParser.build(code);
+            final nissayaDb =
+                await ref.read(nissayaDbByFilenameProvider(filename).future);
+            if (nissayaDb != null) {
+              for (final p in paraIds) {
+                final sentences = await nissayaDb.getSentences(bookId, p);
+                for (final s in sentences) {
+                  final text = s.formattedText;
+                  if (text.trim().isNotEmpty) {
+                    final key = '${s.paraId}:${s.lineId}';
+                    translationByLine.putIfAbsent(key, () => text);
+                  }
+                }
+              }
+            }
+          } else {
+            final transDb = await ref.read(
+              translationDbProvider(code).future,
+            );
+            if (transDb == null) continue;
+            final transRows = await transDb
+                .customSelect(
+                  'SELECT para_id, line_id, translation FROM sentences '
+                  'WHERE book_id = ? AND para_id IN (${paraIds.map((_) => '?').join(',')})',
+                  variables: [
+                    Variable.withString(bookId),
+                    for (final p in paraIds) Variable.withInt(p),
+                  ],
+                )
+                .get();
+            for (final r in transRows) {
+              final pid = r.data['para_id'] as int;
+              final lid = r.data['line_id'] as int;
+              final text = (r.data['translation'] as String?) ?? '';
+              if (text.trim().isEmpty) continue;
+              final key = '$pid:$lid';
+              // Keep the first (highest-priority) language's translation.
+              translationByLine.putIfAbsent(key, () => text);
+            }
           }
         }
 

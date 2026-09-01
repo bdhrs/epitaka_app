@@ -9,6 +9,7 @@ library;
 import 'package:drift/drift.dart' show Variable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/models/translation_version.dart';
 import '../../core/providers/database_provider.dart';
 import '../../core/providers/settings_provider.dart';
 import '../widgets/preview_content.dart';
@@ -73,25 +74,45 @@ Future<ParagraphPreviewData> loadParagraphPreview(
   final translationMap = <String, Map<String, String>>{};
   if (activeLang != null) {
     try {
-      final transDb = await ref.read(translationDbProvider(activeLang).future);
-      if (transDb != null) {
-        final transRows = await transDb
-            .customSelect(
-              'SELECT para_id, line_id, translation FROM sentences '
-              'WHERE book_id = ? AND para_id >= ? AND para_id <= ? '
-              'ORDER BY para_id, line_id',
-              variables: [
-                Variable.withString(bookId),
-                Variable.withInt(paraId),
-                Variable.withInt(end),
-              ],
-            )
-            .get();
-        for (final row in transRows) {
-          final key = '${row.data['para_id']}:${row.data['line_id']}';
-          final t = row.data['translation'] as String?;
-          if (t != null && t.isNotEmpty) {
-            translationMap.putIfAbsent(key, () => {})[activeLang] = t;
+      if (TranslationFilenameParser.isNissaya(activeLang)) {
+        final filename = TranslationFilenameParser.build(activeLang);
+        final nissayaDb =
+            await ref.read(nissayaDbByFilenameProvider(filename).future);
+        if (nissayaDb != null) {
+          for (int p = paraId; p <= end; p++) {
+            final sentences = await nissayaDb.getSentences(bookId, p);
+            for (final s in sentences) {
+              final key = '${s.paraId}:${s.lineId}';
+              final formatted = s.formattedText;
+              if (formatted.isNotEmpty) {
+                translationMap.putIfAbsent(key, () => {})[activeLang] =
+                    formatted;
+              }
+            }
+          }
+        }
+      } else {
+        final transDb =
+            await ref.read(translationDbProvider(activeLang).future);
+        if (transDb != null) {
+          final transRows = await transDb
+              .customSelect(
+                'SELECT para_id, line_id, translation FROM sentences '
+                'WHERE book_id = ? AND para_id >= ? AND para_id <= ? '
+                'ORDER BY para_id, line_id',
+                variables: [
+                  Variable.withString(bookId),
+                  Variable.withInt(paraId),
+                  Variable.withInt(end),
+                ],
+              )
+              .get();
+          for (final row in transRows) {
+            final key = '${row.data['para_id']}:${row.data['line_id']}';
+            final t = row.data['translation'] as String?;
+            if (t != null && t.isNotEmpty) {
+              translationMap.putIfAbsent(key, () => {})[activeLang] = t;
+            }
           }
         }
       }

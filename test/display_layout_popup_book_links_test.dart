@@ -23,6 +23,21 @@ List<Override> baseOverrides({List<TranslationVersion> versions = const []}) =>
     [localTranslationVersionsProvider.overrideWith((ref) async => versions)];
 
 void main() {
+  setUp(() {
+    TestWidgetsFlutterBinding.ensureInitialized();
+    TranslationLanguageRegistry.registerFromManifest(
+      TranslationManifest.fromString('''{
+        "version": 1,
+        "languages": {
+          "en": {"englishName": "English", "nativeName": "English", "versions": {}},
+          "my": {"englishName": "Myanmar", "nativeName": "မြန်မာ", "versions": {}},
+          "my_nissaya": {"englishName": "Myanmar Nissaya", "nativeName": "မြန်မာနိဿယ", "versions": {}},
+          "th": {"englishName": "Thai", "nativeName": "ไทย", "versions": {}}
+        }
+      }'''),
+    );
+  });
+
   Widget wrap(Widget child) => ProviderScope(
     overrides: [
       settingsProvider.overrideWith((ref) {
@@ -49,6 +64,12 @@ void main() {
   testWidgets('popup checkbox reflects and toggles showBookLinks', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     await tester.pumpWidget(wrap(const DisplayLayoutPopup()));
     await tester.pumpAndSettle();
 
@@ -71,6 +92,12 @@ void main() {
   testWidgets('popup toggle is temporary — the saved preference is untouched', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     // Seed a persisted 'show_book_links' preference.
     SharedPreferences.setMockInitialValues({'show_book_links': true});
     final prefs = await SharedPreferences.getInstance();
@@ -107,6 +134,12 @@ void main() {
   testWidgets(
     'popup tap-to-translate row offers Disabled/Single/Double and persists the gesture',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
       // Seed a persisted 'word_lookup_gesture' preference (1 = single tap).
       SharedPreferences.setMockInitialValues({'word_lookup_gesture': 1});
       final prefs = await SharedPreferences.getInstance();
@@ -252,17 +285,69 @@ void main() {
     // Book-links checkbox + one per downloaded translation.
     expect(find.byType(Checkbox), findsNWidgets(3));
 
-    // The language registry is empty in tests, so names fall back to the
-    // uppercased code. Toggling a row enables that language immediately and
-    // does not close the popup.
-    await tester.tap(find.text('MY'));
+    // Toggling a row enables that language immediately and does not close the popup.
+    await tester.tap(find.textContaining('Myanmar'));
     await tester.pumpAndSettle();
     expect(notifier.state.enabledTranslations, contains('my'));
     expect(find.byType(DisplayLayoutPopup), findsOneWidget);
 
     // Toggling off removes it again.
-    await tester.tap(find.text('MY'));
+    await tester.tap(find.textContaining('Myanmar'));
     await tester.pumpAndSettle();
     expect(notifier.state.enabledTranslations, isNot(contains('my')));
+  });
+
+  testWidgets('displays both Myanmar and Myanmar Nissaya as toggleable rows', (
+    tester,
+  ) async {
+    final notifier = SettingsNotifier(null);
+    notifier.state = const AppSettings(
+      showBookLinks: true,
+      showTranslation: true,
+      enabledTranslations: ['my', 'my_nissaya'],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+          ...baseOverrides(
+            versions: const [
+              TranslationVersion(
+                languageCode: 'my',
+                filename: 'epitaka_my.db',
+                isAvailable: true,
+                displayName: 'Default',
+              ),
+              TranslationVersion(
+                languageCode: 'my_nissaya',
+                filename: 'epitaka_my_nissaya.db',
+                isNissaya: true,
+                isAvailable: true,
+                displayName: 'Default',
+              ),
+            ],
+          ),
+        ],
+        child: MaterialApp(
+          supportedLocales: AppLocalizationsDelegate.supportedLocales,
+          localizationsDelegates: const [AppLocalizationsDelegate()],
+          theme: ThemeData(
+            useMaterial3: true,
+            splashFactory: InkSplash.splashFactory,
+          ),
+          home: const Scaffold(body: DisplayLayoutPopup()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Checkboxes: 1 for Book links, 1 for Myanmar, 1 for Myanmar Nissaya = 3
+    expect(find.byType(Checkbox), findsNWidgets(3));
+    expect(find.text('Myanmar · မြန်မာ'), findsOneWidget);
+    expect(find.text('Myanmar Nissaya · မြန်မာနိဿယ'), findsOneWidget);
+
+    expect(notifier.state.enabledTranslations, contains('my'));
+    expect(notifier.state.enabledTranslations, contains('my_nissaya'));
   });
 }

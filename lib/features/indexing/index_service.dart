@@ -141,6 +141,7 @@ class IndexService {
     // Deduplicate by language code — only build one index per language
     final seenLangCodes = <String>{};
     for (final version in availableVersions) {
+      if (version.isNissaya) continue;
       if (seenLangCodes.contains(version.languageCode)) continue;
       seenLangCodes.add(version.languageCode);
       try {
