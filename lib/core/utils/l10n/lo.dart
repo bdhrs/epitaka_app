@@ -525,10 +525,10 @@ const Map<String, String> lo = {
 
   'Semantic search': 'ການຄົ້ນຫາຕາມຄວາມໝາຍ',
   'Investigation & exploration': 'ການສືບຄົ້ນ ແລະ ການສຳຫຼວດ',
-  'Tipitaka': 'ພຣະໄຕຣປິດົກ',
+  'Tipiṭaka': 'ພຣະໄຕຣປິດົກ',
   'Feedback': 'ຄຳຄິດເຫັນ',
   'Pāli Tipiṭaka Reader': 'ໂປຣແກຣມອ່ານພຣະໄຕຣປິດົກບາລີ',
-  'Vimaṃsa': 'ວີມັງສາ',
+  'Vīmaṃsā': 'ວີມັງສາ',
 
   // ── Gavesana FTS Build Dialog ───────────────────────────────────────
 
@@ -658,22 +658,22 @@ const Map<String, String> lo = {
   'Reset layout': 'ຣີເຊັດຮູບແບບ',
 
   // ── Gavesana ────────────────────────────────────────────────────────
-  'Gavesana': 'ຄະເວສະນະ',
+  'Gavesanā': 'ຄະເວສະນະ',
   'Gavesana AI Search': 'ການຄົ້ນຫາດ້ວຍ AI ຄະເວສະນະ',
   'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesana panel for detailed results.':
       'ການຄົ້ນຫາຕາມຄວາມໝາຍດ້ວຍ AI ທົ່ວພຣະໄຕຣປິດົກ.\n\nເປີດແຜງຄະເວສະນະແບບເຕັມເພື່ອເບິ່ງຜົນລັບລະອຽດ.',
 
-  // ── AI Q&A (Vimaṃsa) ────────────────────────────────────────────────
+  // ── AI Q&A (Vīmaṃsā) ────────────────────────────────────────────────
   'Navigation menu': 'ເມນູນຳທາງ',
   'Chat history': 'ປະຫວັດການສົນທະນາ',
   'New chat': 'ການສົນທະນາໃໝ່',
   'Clear chat': 'ລ້າງການສົນທະນາ',
-  'Vimaṃsa Settings': 'ການຕັ້ງຄ່າວີມັງສາ',
+  'Vīmaṃsā Settings': 'ການຕັ້ງຄ່າວີມັງສາ',
   'Building heading index…': 'ກຳລັງສ້າງດັດຊະນີຫົວຂໍ້…',
   'Heading index needed for @ — build now?':
       'ຕ້ອງການດັດຊະນີຫົວຂໍ້ສຳລັບ @ — ສ້າງດຽວນີ້ບໍ?',
   'Ask about the Tipitaka': 'ຖາມກ່ຽວກັບພຣະໄຕຣປິດົກ',
-  'Vimaṃsa — investigation through questioning.\n'
+  'Vīmaṃsā — investigation through questioning.\n'
           'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
           'and provides detailed answers with clickable citations.\n'
           'Each chat thread is saved — you can continue later.':

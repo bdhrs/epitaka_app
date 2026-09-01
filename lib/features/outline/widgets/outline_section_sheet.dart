@@ -8,7 +8,7 @@
 ///   * **Study guide** tab — the AI study guide (markdown with tappable
 ///     citations) read from the local English translation DB (offline, with
 ///     a network fallback) and rendered with the shared [AiMarkdownView]
-///     (same widget the Vimaṃsa chat uses). The tab is only shown once a
+///     (same widget the Vīmaṃsā chat uses). The tab is only shown once a
 ///     guide actually resolves — sections without a summary just get the
 ///     Text tab, so no spinner ever hangs on a missing guide.
 ///   * **Open in Reader** — jumps the reader to the section (or, if the
@@ -58,9 +58,9 @@ Future<void> showOutlineSectionSheet(
   } catch (e) {
     if (context.mounted) {
       final loc = AppLocalizations.of(context);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(loc.errorMessage('$e'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(loc.errorMessage('$e'))));
     }
     return;
   }
@@ -69,9 +69,9 @@ Future<void> showOutlineSectionSheet(
 
   if (data.lines.isEmpty) {
     final loc = AppLocalizations.of(context);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(loc.noContentAvailable)),
-    );
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(loc.noContentAvailable)));
     return;
   }
 
@@ -109,10 +109,8 @@ class _OutlineSectionSheet extends ConsumerStatefulWidget {
 class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
   int _tab = 0; // 0 = text excerpt, 1 = study guide
 
-  StudyGuideQuery get _studyGuideQuery => StudyGuideQuery(
-        bookId: widget.bookId,
-        sectionId: widget.item.paraId,
-      );
+  StudyGuideQuery get _studyGuideQuery =>
+      StudyGuideQuery(bookId: widget.bookId, sectionId: widget.item.paraId);
 
   void _openStudyGuideTab() {
     if (_tab == 1) return;
@@ -120,13 +118,15 @@ class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
   }
 
   void _openInReader() {
-    ref.read(readerTabsProvider.notifier).openTab(
-      ReaderTabInfo(
-        bookId: widget.bookId,
-        bookName: widget.bookName,
-        initialParaId: widget.item.paraId,
-      ),
-    );
+    ref
+        .read(readerTabsProvider.notifier)
+        .openTab(
+          ReaderTabInfo(
+            bookId: widget.bookId,
+            bookName: widget.bookName,
+            initialParaId: widget.item.paraId,
+          ),
+        );
     Navigator.of(context).pop(); // close the quickview
     openReaderRoute(context);
   }
@@ -185,8 +185,11 @@ class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.account_tree_outlined,
-                      size: 16, color: colors.primary),
+                  Icon(
+                    Icons.account_tree_outlined,
+                    size: 16,
+                    color: colors.primary,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Column(
@@ -379,8 +382,8 @@ class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
           if (guide.title.isNotEmpty) const SizedBox(height: 12),
           AiMarkdownView(
             data: guide.contentMd,
-            onCitationTap: (bookId, paraId, lineId) {
-              // Citation chips reuse the vimaṃsa quickview so the user
+            onCitationTap: (bookId, paraId, lineId, {lineIdTo}) {
+              // Citation chips reuse the Vīmaṃsā quickview so the user
               // can check the quoted passage right here.
               showCitationQuickview(
                 context,
@@ -389,6 +392,7 @@ class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
                 bookName: bookId,
                 paraId: paraId,
                 lineId: lineId,
+                lineIdTo: lineIdTo,
               );
             },
           ),

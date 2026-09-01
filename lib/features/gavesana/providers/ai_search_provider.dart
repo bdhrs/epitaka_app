@@ -67,7 +67,7 @@ class AiSearchDone extends AiSearchState {
 
 /// Runs the Gavesana AI search: plan → search → collect passages.
 ///
-/// Reuses the exact same tool-calling engine as Vimaṃsa (see
+/// Reuses the exact same tool-calling engine as Vīmaṃsā (see
 /// [runAiToolLoop] in `ai_api_client.dart`), so Gavesana gets the same
 /// search tools against the local Tipitaka databases without any
 /// on-device embeddings. The AI decides how to search (up to
@@ -107,10 +107,7 @@ class AiSearchNotifier extends StateNotifier<AiSearchState> {
           {
             'role': 'user',
             'parts': [
-              {
-                'text':
-                    'Find passages in the Tipitaka relevant to: "$trimmed"',
-              },
+              {'text': 'Find passages in the Tipitaka relevant to: "$trimmed"'},
             ],
           },
         ],
@@ -227,7 +224,9 @@ class AiSearchNotifier extends StateNotifier<AiSearchState> {
       }
 
       // ── Hand the passages to the normal search results view ─────
-      await _ref.read(searchProvider.notifier).showAiResults(
+      await _ref
+          .read(searchProvider.notifier)
+          .showAiResults(
             query: trimmed,
             passages: passages.take(kAiSearchMaxPassages).toList(),
           );

@@ -17,8 +17,15 @@ import '../services/citation_quickview.dart';
 /// Renders a single message bubble in the AI Q&A chat.
 class AiQaMessageBubble extends ConsumerWidget {
   final AiQaMessage message;
+  final VoidCallback? onEdit;
+  final VoidCallback? onRetry;
 
-  const AiQaMessageBubble({super.key, required this.message});
+  const AiQaMessageBubble({
+    super.key,
+    required this.message,
+    this.onEdit,
+    this.onRetry,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -84,6 +91,12 @@ class AiQaMessageBubble extends ConsumerWidget {
               colors,
             ),
 
+          // Action buttons below bubble
+          if (!isAssistantWithToolCalls &&
+              !isCurrentlyStreaming &&
+              !message.isThinking)
+            _buildActionButtons(context, ref, isUser, displayText, colors),
+
           // Citation buttons (only when streaming is complete)
           if (message.citations.isNotEmpty && !isCurrentlyStreaming)
             _buildCitationsBar(context, ref, colors),
@@ -117,8 +130,7 @@ class AiQaMessageBubble extends ConsumerWidget {
         maxWidth: isPhone
             ? MediaQuery.of(context).size.width * 0.97
             : MediaQuery.of(context).size.width * 0.85,
-      ),
-      child: Column(
+      ),          child: Column(
         crossAxisAlignment: isUser
             ? CrossAxisAlignment.end
             : CrossAxisAlignment.start,
@@ -133,9 +145,6 @@ class AiQaMessageBubble extends ConsumerWidget {
                   isStreaming,
                   colors,
                 ),
-          // Copy button at the bottom of the bubble
-          const SizedBox(height: 6),
-          _CopyButton(text: displayText),
         ],
       ),
     );
@@ -299,7 +308,9 @@ class AiQaMessageBubble extends ConsumerWidget {
     ColorScheme colors,
   ) {
     // Parse [book_id:para_id:line_id] or [book_id:para_id:line1-line2] citations
-    final citationRegex = RegExp(r'\[([a-zA-Z0-9_.-]+):(\d+):(\d+)(?:-(\d+))?\]');
+    // Matches [book_id:para_id:line_id] or [book_id:para_id:line_from-line_to]
+    // Range separator: hyphen (-) or en-dash (–, U+2013).
+    final citationRegex = RegExp(r'\[([a-zA-Z0-9_.-]+):(\d+):(\d+)(?:[-\u2013](\d+))?\]');
     final spans = <InlineSpan>[];
     int lastEnd = 0;
 
@@ -320,12 +331,26 @@ class AiQaMessageBubble extends ConsumerWidget {
       final bookId = match.group(1)!;
       final paraId = int.tryParse(match.group(2)!) ?? 0;
       final lineId = int.tryParse(match.group(3)!) ?? 1;
+      final lineIdTo = match.group(4) != null
+          ? int.tryParse(match.group(4)!)
+          : null;
+
+      final label = lineIdTo != null
+          ? '$bookId §$paraId:$lineId-$lineIdTo'
+          : '$bookId §$paraId:$lineId';
 
       spans.add(
         WidgetSpan(
           alignment: PlaceholderAlignment.middle,
           child: GestureDetector(
-            onTap: () => _openCitation(context, ref, bookId, paraId, lineId),
+            onTap: () => _openCitation(
+              context,
+              ref,
+              bookId,
+              paraId,
+              lineId,
+              lineIdTo: lineIdTo,
+            ),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
               margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -342,7 +367,7 @@ class AiQaMessageBubble extends ConsumerWidget {
                   Icon(Icons.format_quote, size: 10, color: colors.primary),
                   const SizedBox(width: 2),
                   Text(
-                    '$bookId §$paraId:$lineId',
+                    label,
                     style: TextStyle(
                       color: colors.primary,
                       fontSize: 11,
@@ -410,8 +435,85 @@ class AiQaMessageBubble extends ConsumerWidget {
   ) {
     return AiMarkdownView(
       data: text,
-      onCitationTap: (bookId, paraId, lineId) =>
-          _openCitation(context, ref, bookId, paraId, lineId),
+      onCitationTap: (bookId, paraId, lineId, {lineIdTo}) =>
+          _openCitation(context, ref, bookId, paraId, lineId,
+              lineIdTo: lineIdTo),
+    );
+  }
+
+  Widget _buildActionButtons(
+    BuildContext context,
+    WidgetRef ref,
+    bool isUser,
+    String displayText,
+    ColorScheme colors,
+  ) {
+    final loc = AppLocalizations.of(context);
+    return Padding(
+      padding: const EdgeInsets.only(top: 4, left: 4, right: 4),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Copy button (both)
+          _ActionChip(
+            icon: Icons.content_copy,
+            tooltip: loc.copyMessage,
+            onTap: () {
+              Clipboard.setData(ClipboardData(text: displayText));
+              ScaffoldMessenger.of(context).clearSnackBars();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(loc.copied),
+                  duration: const Duration(seconds: 1),
+                  behavior: SnackBarBehavior.floating,
+                  width: 100,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              );
+            },
+          ),
+          // Edit button (user only)
+          if (isUser && onEdit != null)
+            _ActionChip(
+              icon: Icons.edit,
+              tooltip: loc.editNote,
+              onTap: onEdit!,
+            ),
+          // Share button (assistant only)
+          if (!isUser)
+            _ActionChip(
+              icon: Icons.share,
+              tooltip: loc.share,
+              onTap: () {
+                // Share functionality — copy to clipboard as share fallback
+                Clipboard.setData(ClipboardData(text: displayText));
+                ScaffoldMessenger.of(context).clearSnackBars();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(loc.copied),
+                    duration: const Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                    width: 100,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                );
+              },
+            ),
+          // Retry button (assistant only)
+          if (!isUser && onRetry != null)
+            _ActionChip(
+              icon: Icons.refresh,
+              tooltip: loc.retry,
+              onTap: onRetry!,
+            ),
+        ],
+      ),
     );
   }
 
@@ -490,8 +592,9 @@ class AiQaMessageBubble extends ConsumerWidget {
     WidgetRef ref,
     String bookId,
     int paraId,
-    int lineId,
-  ) {
+    int lineId, {
+    int? lineIdTo,
+  }) {
     // Release the chat input's focus before opening the reference. On a
     // touch device the input keeps focus (and the keyboard stays up) across
     // the modal quickview, so when the user closes the sheet / goes back the
@@ -515,6 +618,7 @@ class AiQaMessageBubble extends ConsumerWidget {
       bookName: bookId,
       paraId: paraId,
       lineId: lineId,
+      lineIdTo: lineIdTo,
     );
   }
 }
@@ -523,40 +627,36 @@ class AiQaMessageBubble extends ConsumerWidget {
 //  COPY BUTTON
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Small icon button at the bottom of each message bubble. Copies the
-/// message text to the clipboard and briefly shows "Copied!" feedback.
-class _CopyButton extends StatelessWidget {
-  final String text;
+/// Compact action chip for message action buttons.
+class _ActionChip extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
 
-  const _CopyButton({required this.text});
+  const _ActionChip({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
 
-    return IconButton(
-      icon: const Icon(Icons.content_copy, size: 13),
-      color: colors.onSurfaceVariant.withValues(alpha: 0.35),
-      tooltip: AppLocalizations.of(context).copyMessage,
-      visualDensity: VisualDensity.compact,
-      padding: EdgeInsets.zero,
-      constraints: const BoxConstraints(minWidth: 26, minHeight: 26),
-      onPressed: () {
-        Clipboard.setData(ClipboardData(text: text));
-        ScaffoldMessenger.of(context).clearSnackBars();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(AppLocalizations.of(context).copied),
-            duration: const Duration(seconds: 1),
-            behavior: SnackBarBehavior.floating,
-            width: 100,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Icon(
+            icon,
+            size: 14,
+            color: colors.onSurfaceVariant.withValues(alpha: 0.45),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }

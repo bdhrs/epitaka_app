@@ -124,10 +124,7 @@ List<PaliSegment> convertPaliToScriptSegments(
   final unmodifiable = List<PaliSegment>.unmodifiable(segments);
   if (_segmentsCache.length >= _kSegmentsCacheCap) {
     final removeCount = _kSegmentsCacheCap ~/ 4;
-    final keys = _segmentsCache.keys.toList();
-    for (var i = 0; i < removeCount; i++) {
-      _segmentsCache.remove(keys[i]);
-    }
+    _removeOldestEntries(_segmentsCache, removeCount);
   }
   _segmentsCache[key] = unmodifiable;
   return unmodifiable;
@@ -181,8 +178,16 @@ List<PaliSegment> _convertPaliToScriptSegmentsUncached(
   return segments;
 }
 
+void _removeOldestEntries<K, V>(Map<K, V> cache, int count) {
+  final iterator = cache.keys.iterator;
+  for (var i = 0; i < count && iterator.moveNext(); i++) {
+    cache.remove(iterator.current);
+  }
+}
+
 const int _kSegmentsCacheCap = 8000;
-final Map<String, List<PaliSegment>> _segmentsCache = {};
+final Map<String, List<PaliSegment>> _segmentsCache =
+    LinkedHashMap<String, List<PaliSegment>>();
 
 /// Memoizes [convertPaliToScript] results, keyed by "scriptIndex\u0000text".
 ///
@@ -206,10 +211,7 @@ String _cacheConvert(
     // Evict the oldest quarter (FIFO via LinkedHashMap insertion order) to
     // bound memory without dropping every entry at once.
     final removeCount = _kConvertCacheCap ~/ 4;
-    final keys = _convertCache.keys.toList();
-    for (var i = 0; i < removeCount; i++) {
-      _convertCache.remove(keys[i]);
-    }
+    _removeOldestEntries(_convertCache, removeCount);
   }
   _convertCache[key] = result;
   return result;
@@ -278,10 +280,7 @@ String convertPaliToScriptPreservingHtml(String text, Script? targetScript) {
   final result = _convertPaliToScriptPreservingHtmlUncached(text, targetScript);
   if (_preserveCache.length >= _kPreserveCacheCap) {
     final removeCount = _kPreserveCacheCap ~/ 4;
-    final keys = _preserveCache.keys.toList();
-    for (var i = 0; i < removeCount; i++) {
-      _preserveCache.remove(keys[i]);
-    }
+    _removeOldestEntries(_preserveCache, removeCount);
   }
   _preserveCache[key] = result;
   return result;

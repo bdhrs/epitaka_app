@@ -220,6 +220,10 @@ class PaliDefinitionCard extends ConsumerWidget {
             initialLineId: entry.lineId,
           ),
         );
+    // Close the dictionary sheet/panel so the user can see the book.
+    // On mobile the dictionary is a modal bottom sheet; on desktop it's
+    // a sidebar panel that closes itself when the reader tab switches.
+    Navigator.of(context, rootNavigator: true).maybePop();
     openReaderRoute(context);
   }
 }

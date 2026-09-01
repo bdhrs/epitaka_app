@@ -163,7 +163,8 @@ class AppDatabase extends _$AppDatabase {
         created_at TEXT NOT NULL,
         updated_at TEXT NOT NULL,
         message_count INTEGER NOT NULL DEFAULT 0,
-        max_messages INTEGER NOT NULL DEFAULT 8
+        max_messages INTEGER NOT NULL DEFAULT 8,
+        is_pinned INTEGER NOT NULL DEFAULT 0
       )
     ''');
     await customStatement('''
@@ -211,7 +212,7 @@ class AppDatabase extends _$AppDatabase {
   Future<List<ChatThread>> getAllChatThreads() async {
     await _ensureChatTables();
     final rows = await customSelect(
-      'SELECT * FROM chat_threads ORDER BY updated_at DESC',
+      'SELECT * FROM chat_threads ORDER BY is_pinned DESC, updated_at DESC',
     ).get();
     return rows
         .map(
@@ -222,6 +223,7 @@ class AppDatabase extends _$AppDatabase {
             'updated_at': r.data['updated_at'] as String,
             'message_count': r.data['message_count'] as int,
             'max_messages': r.data['max_messages'] as int,
+            'is_pinned': (r.data['is_pinned'] as int?) == 1,
           }),
         )
         .toList();
@@ -243,6 +245,7 @@ class AppDatabase extends _$AppDatabase {
       'updated_at': r['updated_at'] as String,
       'message_count': r['message_count'] as int,
       'max_messages': r['max_messages'] as int,
+      'is_pinned': (r['is_pinned'] as int?) == 1,
     });
   }
 
@@ -272,6 +275,15 @@ class AppDatabase extends _$AppDatabase {
       id,
     ]);
     await customStatement('DELETE FROM chat_threads WHERE id = ?', [id]);
+  }
+
+  /// Toggle the pinned state of a thread.
+  Future<void> toggleChatThreadPinned(String id) async {
+    await _ensureChatTables();
+    await customStatement(
+      'UPDATE chat_threads SET is_pinned = CASE WHEN is_pinned = 1 THEN 0 ELSE 1 END, updated_at = ? WHERE id = ?',
+      [DateTime.now().toIso8601String(), id],
+    );
   }
 
   /// Delete all chat threads and messages.
@@ -359,7 +371,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase(super.e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration {
@@ -423,6 +435,21 @@ class AppDatabase extends _$AppDatabase {
             FROM annotations_old
           ''');
           await customStatement('DROP TABLE annotations_old');
+        }
+        if (from < 7) {
+          // Add is_pinned column to chat_threads for pinned-thread support.
+          // Chat tables are created lazily, so the column may not exist yet.
+          try {
+            await _ensureChatTables();
+            final hasCol = await customSelect(
+              "SELECT name FROM pragma_table_info('chat_threads') WHERE name='is_pinned'",
+            ).get();
+            if (hasCol.isEmpty) {
+              await customStatement(
+                'ALTER TABLE chat_threads ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0',
+              );
+            }
+          } catch (_) {}
         }
         if (from < 6) {
           // Self-healing migration: some devices reached schemaVersion 5

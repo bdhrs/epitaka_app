@@ -1,6 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// Whether the Vimaṃsa (AI assistant) center tab is the visible one in the
+/// Whether the Vīmaṃsā (AI assistant) center tab is the visible one in the
 /// desktop shell.
 ///
 /// Kept in a provider (instead of local state inside [DesktopShell]) so the
@@ -17,7 +17,8 @@ class VimamsaOpenNotifier extends StateNotifier<bool> {
   void close() => state = false;
 }
 
-final vimamsaOpenProvider =
-    StateNotifierProvider<VimamsaOpenNotifier, bool>((ref) {
-      return VimamsaOpenNotifier();
-    });
+final vimamsaOpenProvider = StateNotifierProvider<VimamsaOpenNotifier, bool>((
+  ref,
+) {
+  return VimamsaOpenNotifier();
+});

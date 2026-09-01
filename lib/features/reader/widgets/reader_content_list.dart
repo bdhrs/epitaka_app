@@ -37,6 +37,8 @@ class ReaderContentList extends StatelessWidget {
     this.scrollOffsetController,
     this.ttsHighlightLineId,
     this.ttsHighlightParaId,
+    this.jumpHighlightLineId,
+    this.jumpHighlightParaId,
     this.ttsTargetParaId,
     this.ttsTargetLineKeys = const {},
     this.keyboardFocusParaId,
@@ -89,6 +91,12 @@ class ReaderContentList extends StatelessWidget {
 
   /// Para ID that [ttsHighlightLineId] belongs to.
   final int? ttsHighlightParaId;
+
+  /// Line ID to highlight after a jump (TOC, search, dictionary, etc.).
+  final int? jumpHighlightLineId;
+
+  /// Para ID that [jumpHighlightLineId] belongs to.
+  final int? jumpHighlightParaId;
 
   /// Para ID for which TTS line keys are provided (for fine-scroll).
   final int? ttsTargetParaId;
@@ -262,6 +270,8 @@ class ReaderContentList extends StatelessWidget {
               lookupHighlight: lookupHighlight,
               ttsHighlightLineId: ttsHighlightLineId,
               ttsHighlightParaId: ttsHighlightParaId,
+              jumpHighlightLineId: jumpHighlightLineId,
+              jumpHighlightParaId: jumpHighlightParaId,
               lineKeys: lineKeys,
               keyboardFocusParaId: keyboardFocusParaId,
               keyboardFocusLineId: keyboardFocusLineId,

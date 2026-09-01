@@ -1,5 +1,6 @@
-## What's new in version 1.0.21 (build 27)
+## What's new in version 1.0.21 (build 28)
 
+- [FIX] Fix UI setting, type pali in different scripts, / in windows path.
 - [Fix] iOS TTS Voice via _accessibilitySpeak  and Start Position (viewport thresholding logic)
 - [FIX] Fix TTS on ios and delay between lines of macos intel
 - [Add] Wire apple TTS to the workflow of the TTS, remove tts in selection in the dictionary, fix UI of TTS dialog, settings dialog

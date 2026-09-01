@@ -524,10 +524,10 @@ const Map<String, String> th = {
 
   'Semantic search': 'การค้นหาเชิงความหมาย',
   'Investigation & exploration': 'การสืบค้นและการสำรวจ',
-  'Tipitaka': 'พระไตรปิฎก',
+  'Tipiṭaka': 'พระไตรปิฎก',
   'Feedback': 'ข้อเสนอแนะ',
   'Pāli Tipiṭaka Reader': 'โปรแกรมอ่านพระไตรปิฎกบาลี',
-  'Vimaṃsa': 'วีมังสา',
+  'Vīmaṃsā': 'วีมังสา',
 
   // ── Gavesana FTS Build Dialog ───────────────────────────────────────
 
@@ -656,22 +656,22 @@ const Map<String, String> th = {
   'Library': 'ห้องสมุด',
 
   // ── Gavesana ────────────────────────────────────────────────────────
-  'Gavesana': 'คเวสนา',
+  'Gavesanā': 'คเวสนา',
   'Gavesana AI Search': 'การค้นหาด้วย AI คเวสนา',
   'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesana panel for detailed results.':
       'การค้นหาเชิงความหมายด้วย AI ทั่วพระไตรปิฎก\n\nเปิดแผงคเวสนาแบบเต็มเพื่อดูผลลัพธ์โดยละเอียด',
 
-  // ── AI Q&A (Vimaṃsa) ────────────────────────────────────────────────
+  // ── AI Q&A (Vīmaṃsā) ────────────────────────────────────────────────
   'Navigation menu': 'เมนูนำทาง',
   'Chat history': 'ประวัติการสนทนา',
   'New chat': 'การสนทนาใหม่',
   'Clear chat': 'ล้างการสนทนา',
-  'Vimaṃsa Settings': 'การตั้งค่าวีมังสา',
+  'Vīmaṃsā Settings': 'การตั้งค่าวีมังสา',
   'Building heading index…': 'กำลังสร้างดัชนีหัวข้อ…',
   'Heading index needed for @ — build now?':
       'ต้องใช้ดัชนีหัวข้อสำหรับ @ — สร้างตอนนี้หรือไม่?',
   'Ask about the Tipitaka': 'ถามเกี่ยวกับพระไตรปิฎก',
-  'Vimaṃsa — investigation through questioning.\n'
+  'Vīmaṃsā — investigation through questioning.\n'
           'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
           'and provides detailed answers with clickable citations.\n'
           'Each chat thread is saved — you can continue later.':

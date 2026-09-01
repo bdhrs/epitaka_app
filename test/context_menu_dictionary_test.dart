@@ -83,9 +83,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       final panels = container.read(sidePanelProvider);
-      expect(panels.right.openPanel, SidePanelType.dictionary,
+      expect(panels.left.openPanel, SidePanelType.dictionary,
           reason: 'dictionary panel opened from the context menu item');
-      expect(panels.right.panelData, 'bhagavā',
+      expect(panels.left.panelData, 'bhagavā',
           reason: 'the word under the menu was looked up, like double-tap');
     },
   );

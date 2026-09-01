@@ -55,6 +55,13 @@ class ReadingParagraph extends StatelessWidget {
   /// incorrectly highlight the same line number in other paragraphs.
   final int? ttsHighlightParaId;
 
+  /// Line ID to highlight after a jump (TOC, search, dictionary, etc.).
+  /// The highlight fades out after a few seconds.
+  final int? jumpHighlightLineId;
+
+  /// Paragraph ID that [jumpHighlightLineId] belongs to.
+  final int? jumpHighlightParaId;
+
   /// Optional per-line GlobalKeys, keyed by lineId. When provided (only
   /// meaningful in [ParagraphDisplayMode.lineByLine], since the other
   /// modes join every line's text into one continuous block), the reader
@@ -135,6 +142,8 @@ class ReadingParagraph extends StatelessWidget {
     this.lookupHighlight,
     this.ttsHighlightLineId,
     this.ttsHighlightParaId,
+    this.jumpHighlightLineId,
+    this.jumpHighlightParaId,
     this.lineKeys,
     this.keyboardFocusParaId,
     this.keyboardFocusLineId,
@@ -447,6 +456,12 @@ class ReadingParagraph extends StatelessWidget {
             paragraph.paraId == ttsHighlightParaId &&
             lineId == ttsHighlightLineId;
 
+        final isJumpHighlighted =
+            jumpHighlightLineId != null &&
+            jumpHighlightParaId != null &&
+            paragraph.paraId == jumpHighlightParaId &&
+            lineId == jumpHighlightLineId;
+
         final isKeyboardFocus =
             keyboardFocusParaId != null &&
             keyboardFocusLineId != null &&
@@ -508,6 +523,20 @@ class ReadingParagraph extends StatelessWidget {
               ),
           ],
         );
+
+        // The jump highlight wraps the line in a tinted container that
+        // fades out over time. TTS highlight and keyboard focus take
+        // precedence when they would also apply.
+        if (isJumpHighlighted && !isHighlighted && !isKeyboardFocus) {
+          return Padding(
+            key: lineKeys?[lineId],
+            padding: const EdgeInsets.only(bottom: 6),
+            child: _JumpHighlightContainer(
+              colors: colors,
+              child: lineContent,
+            ),
+          );
+        }
 
         // The keyboard focus line gets a subtle backdrop so the reading
         // cursor is visible; the TTS highlight (isHighlighted) takes
@@ -948,7 +977,7 @@ class ReadingParagraph extends StatelessWidget {
     }
 
     return PaliTextWithVariants(
-      text,
+      _insertSoftHyphens(text),
       script: script,
       colors: colors,
       style: baseStyle,
@@ -1488,6 +1517,76 @@ class ReadingParagraph extends StatelessWidget {
   }
 }
 
+/// Minimum word length (in characters) before soft hyphens are inserted.
+/// Short/ordinary words never need breaking, so this avoids peppering
+/// every word with invisible hyphenation points.
+const int _hyphenationMinWordLength = 12;
+
+/// Pāli vowels (both cases). A vowel followed by a consonant is a natural
+/// syllable boundary in Pāli, since syllables are (C)(C)V — so breaking
+/// right after a vowel is always a valid hyphenation point.
+const Set<String> _paliVowels = {
+  'a',
+  'ā',
+  'i',
+  'ī',
+  'u',
+  'ū',
+  'e',
+  'o',
+  'A',
+  'Ā',
+  'I',
+  'Ī',
+  'U',
+  'Ū',
+  'E',
+  'O',
+};
+
+/// Matches runs of Pāli letters (including diacritics), so hyphenation
+/// only touches actual words and leaves spaces, punctuation, and any
+/// markup untouched.
+final RegExp _paliWordPattern = RegExp(r'[a-zA-ZāīūṅñṭḍṇḷṃĀĪŪṄÑṬḌṆḶṀ]+');
+
+/// Inserts Unicode soft hyphens (U+00AD) at Pāli syllable boundaries in
+/// any word at least [_hyphenationMinWordLength] characters long. A soft
+/// hyphen is invisible and has no effect on layout unless the text engine
+/// actually needs to break the line there — which is exactly the case a
+/// single very long Pāli word can hit on a narrow phone screen, where it
+/// would otherwise overflow instead of wrapping.
+///
+/// Only operates on runs of plain Pāli letters (see [_paliWordPattern]),
+/// so it's safe to call on text that may also contain HTML-style markup.
+String _insertSoftHyphens(String input) {
+  const softHyphen = '\u00AD';
+  const minSegment = 3;
+
+  return input.replaceAllMapped(_paliWordPattern, (match) {
+    final word = match.group(0)!;
+    if (word.length < _hyphenationMinWordLength) return word;
+
+    final buffer = StringBuffer();
+    var sinceLastBreak = 0;
+    for (var i = 0; i < word.length; i++) {
+      final ch = word[i];
+      buffer.write(ch);
+      sinceLastBreak++;
+      final hasNext = i + 1 < word.length;
+      final remaining = word.length - (i + 1);
+      if (hasNext &&
+          _paliVowels.contains(ch) &&
+          !_paliVowels.contains(word[i + 1]) &&
+          sinceLastBreak >= minSegment &&
+          remaining >= minSegment) {
+        buffer.write(softHyphen);
+        sinceLastBreak = 0;
+      }
+    }
+    return buffer.toString();
+  });
+}
+
 /// Display form of a raw page number: strips the leading "volume." prefix so
 /// "1.17" renders as "17", like the folio of a printed book. Values without a
 /// dot are returned unchanged.
@@ -1641,6 +1740,73 @@ class _ExpandableChipsState extends State<_ExpandableChips> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Container that shows a jump-highlighted line with a fade-out animation.
+/// Starts fully opaque with a tinted background, then fades to transparent
+/// over [_kJumpHighlightDuration] seconds.
+class _JumpHighlightContainer extends StatefulWidget {
+  final ColorScheme colors;
+  final Widget child;
+
+  const _JumpHighlightContainer({required this.colors, required this.child});
+
+  @override
+  State<_JumpHighlightContainer> createState() =>
+      _JumpHighlightContainerState();
+}
+
+class _JumpHighlightContainerState extends State<_JumpHighlightContainer>
+    with SingleTickerProviderStateMixin {
+  static const _kTotalDuration = Duration(seconds: 3);
+
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: _kTotalDuration);
+    // Hold at full opacity for 2s, then fade out over 1s.
+    _opacity = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(
+        parent: _controller,
+        curve: const Interval(0.667, 1.0, curve: Curves.easeOut),
+      ),
+    );
+    _controller.forward();
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacity,
+      builder: (context, child) {
+        final alpha = _opacity.value;
+        // Warm amber/orange accent — stands out against both light and
+        // dark backgrounds without looking harsh.
+        final accent = Color(0xFFE8A040);
+        return Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(
+              color: accent.withValues(alpha: 0.85 * alpha),
+              width: 1.5,
+            ),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+          child: child,
+        );
+      },
+      child: widget.child,
     );
   }
 }

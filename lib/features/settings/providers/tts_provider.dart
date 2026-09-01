@@ -536,13 +536,12 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
 
     // TTS voice — apply the user's chosen voice from the system voice
     // list, if one is set AND it belongs to the language being spoken.
-    // Voices come from [getVoices] (name + locale). Skipping the
-    // explicit voice for other languages (e.g. an English voice would
-    // garble Sinhala-converted Pāli) prevents the saved voice from
-    // overriding the language setting. Only re-apply when the
-    // (language, voice) pair actually changed to avoid redundant
-    // platform calls per line.
-    final voiceName = settings.ttsVoice;
+    // Pāli lines use their own dedicated voice setting (ttsPaliVoice)
+    // so users can pick the best Hindi voice for Pāli pronunciation
+    // separately from the translation voice.
+    final voiceName = isPaliLine
+        ? settings.ttsPaliVoice
+        : settings.ttsVoice;
     final voiceKey = '$effectiveLang|$voiceName';
     if (voiceName.isNotEmpty &&
         voiceName != 'default' &&
@@ -1105,16 +1104,14 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
     super.dispose();
   }
 
-  /// Map user-facing speed (0.1–4.0) to flutter_tts speech rate (0.0–1.0).
+  /// Map user-facing speed (0.1–8.0) to flutter_tts speech rate (0.0–1.0).
   /// flutter_tts rate ~0.5 is normal speech, 1.0 is max.
   double _mapSpeedToSystemRate(double userSpeed) {
-    // Clamp to [0.1, 4.0]
-    final clamped = userSpeed.clamp(0.1, 4.0);
+    // Clamp to [0.1, 8.0]
+    final clamped = userSpeed.clamp(0.1, 8.0);
     if (clamped >= 0.5) {
-      // Keep the original 0.5–4.0 mapping untouched (0.5→0.25, 1.0→0.35,
-      // 2.0→0.5, 4.0→1.0) so existing speed settings keep their sound;
-      // only the newly-exposed 0.1–0.5 range is slower than before.
-      final ratio = (clamped - 0.5) / (4.0 - 0.5);
+      // Map 0.5→0.25, 1.0→0.35, 4.0→0.85, 8.0→1.0
+      final ratio = (clamped - 0.5) / (8.0 - 0.5);
       return 0.25 + ratio * 0.75;
     }
     // 0.1–0.5: extend the curve downward (0.1→0.15, 0.5→0.25), continuous

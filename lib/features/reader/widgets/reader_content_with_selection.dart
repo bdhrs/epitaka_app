@@ -38,6 +38,8 @@ class ReaderContentWithSelection extends StatelessWidget {
     required this.contextMenuBuilder,
     this.ttsHighlightLineId,
     this.ttsHighlightParaId,
+    this.jumpHighlightLineId,
+    this.jumpHighlightParaId,
     this.ttsTargetParaId,
     this.ttsTargetLineKeys = const {},
     this.keyboardFocusParaId,
@@ -86,6 +88,11 @@ class ReaderContentWithSelection extends StatelessWidget {
   // TTS
   final int? ttsHighlightLineId;
   final int? ttsHighlightParaId;
+
+  // Jump highlight
+  final int? jumpHighlightLineId;
+  final int? jumpHighlightParaId;
+
   final int? ttsTargetParaId;
   final Map<int, GlobalKey> ttsTargetLineKeys;
 
@@ -132,6 +139,8 @@ class ReaderContentWithSelection extends StatelessWidget {
       scrollOffsetController: scrollOffsetController,
       ttsHighlightLineId: ttsHighlightLineId,
       ttsHighlightParaId: ttsHighlightParaId,
+      jumpHighlightLineId: jumpHighlightLineId,
+      jumpHighlightParaId: jumpHighlightParaId,
       ttsTargetParaId: ttsTargetParaId,
       ttsTargetLineKeys: ttsTargetLineKeys,
       keyboardFocusParaId: keyboardFocusParaId,

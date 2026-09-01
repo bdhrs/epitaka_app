@@ -88,7 +88,7 @@ const List<FeatureGuideSection> kFeatureGuideSections = [
       ),
       FeatureGuideStep(
         icon: Icons.auto_awesome,
-        textKey: 'Explain — ask Vimaṃsa AI to explain the selection.',
+        textKey: 'Explain — ask Vīmaṃsā AI to explain the selection.',
       ),
       FeatureGuideStep(
         icon: Icons.notes,
@@ -134,8 +134,7 @@ const List<FeatureGuideSection> kFeatureGuideSections = [
       ),
       FeatureGuideStep(
         icon: Icons.record_voice_over,
-        textKey:
-            'Text-to-Speech — voice, speed, pitch and word replacements.',
+        textKey: 'Text-to-Speech — voice, speed, pitch and word replacements.',
       ),
       FeatureGuideStep(
         icon: Icons.menu_book,
@@ -143,22 +142,23 @@ const List<FeatureGuideSection> kFeatureGuideSections = [
       ),
       FeatureGuideStep(
         icon: Icons.auto_awesome,
-        textKey: 'AI Q&A — enter your API key and pick models for Vimaṃsa.',
+        textKey: 'AI Q&A — enter your API key and pick models for Vīmaṃsā.',
       ),
     ],
   ),
 
-  // ── AI (Vimaṃsa) ────────────────────────────────────────────────────
+  // ── AI (Vīmaṃsā) ────────────────────────────────────────────────────
   FeatureGuideSection(
     id: 'ai',
     icon: Icons.auto_awesome_outlined,
-    titleKey: 'AI — Vimaṃsa',
+    titleKey: 'AI — Vīmaṃsā',
     descKey:
         'Ask the AI about the Tipiṭaka. It searches the Canon and answers with citations.',
     steps: [
       FeatureGuideStep(
         icon: Icons.question_answer,
-        textKey: 'Ask a question — open Vimaṃsa from the menu and ask anything.',
+        textKey:
+            'Ask a question — open Vīmaṃsā from the menu and ask anything.',
       ),
       FeatureGuideStep(
         icon: Icons.auto_awesome,

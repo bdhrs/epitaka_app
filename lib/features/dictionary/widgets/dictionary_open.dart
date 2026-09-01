@@ -44,7 +44,7 @@ bool openDictionaryInPanel(
     // isn't rendered there — so the modal bottom sheet is used instead.
     final notifier = ref.read(sidePanelProvider.notifier);
     final sidePanels = ref.read(sidePanelProvider);
-    if (sidePanels.right.openPanel == SidePanelType.dictionary) {
+    if (sidePanels.left.openPanel == SidePanelType.dictionary) {
       // Already visible — just point it at the new word.
       notifier.updateDictionaryWord(trimmed);
     } else {

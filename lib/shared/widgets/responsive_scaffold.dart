@@ -11,7 +11,7 @@ import 'app_shell.dart';
 /// **Desktop** — renders the IDE-style [DesktopShell]: a VS Code-like
 /// activity bar, a one-at-a-time sidebar (library / search / history /
 /// bookmarks / contents / gavesana) with the dictionary docked at its
-/// bottom, the reader + Vimaṃsa in the center, and an attached status
+/// bottom, the reader + Vīmaṃsā in the center, and an attached status
 /// bar at the bottom.
 class ResponsiveScaffold extends ConsumerWidget {
   /// The main content widget (e.g. [ReaderScreen]).
@@ -37,11 +37,7 @@ class ResponsiveScaffold extends ConsumerWidget {
 
     // Mobile/tablet: traditional AppShell (unchanged).
     if (!isDesktop) {
-      return AppShell(
-        appBar: appBar,
-        drawer: drawer,
-        child: child,
-      );
+      return AppShell(appBar: appBar, drawer: drawer, child: child);
     }
 
     // Desktop: IDE-style shell.

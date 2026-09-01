@@ -172,6 +172,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// persistent timer on each tick. This avoids recreating the timer.
   double _autoScrollSpeed = 0;
 
+  // ── Jump highlight state ───────────────────────────────────────────
+  // When a jump occurs (TOC, search, dictionary, etc.), the target line
+  // is highlighted for a few seconds, then fades out.
+  int? _jumpHighlightParaId;
+  int? _jumpHighlightLineId;
+  Timer? _jumpHighlightTimer;
+
   // App lifecycle state for background TTS optimization
   AppLifecycleState _appLifecycleState = AppLifecycleState.resumed;
 
@@ -196,12 +203,14 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     if (activeTab == null) return;
     if (index < 0 || index >= searchState.matchParaIds.length) return;
 
+    final paraId = searchState.matchParaIds[index];
     final lineId = index < searchState.matchLineIds.length
         ? searchState.matchLineIds[index]
         : 1;
+    _startJumpHighlight(paraId, lineId);
     _scroll.jumpToParagraph(
       activeTab.bookId,
-      searchState.matchParaIds[index],
+      paraId,
       animate: true,
       lineId: lineId,
     );
@@ -210,6 +219,24 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   /// Toggle the in-book search bar.
   void _toggleInBookSearch() {
     ref.read(inBookSearchProvider.notifier).toggleSearchBar();
+  }
+
+  /// Start the jump highlight for [paraId] / [lineId]. The highlight
+  /// stays visible for [_kJumpHighlightDuration] then fades out.
+  void _startJumpHighlight(int paraId, int lineId) {
+    _jumpHighlightTimer?.cancel();
+    setState(() {
+      _jumpHighlightParaId = paraId;
+      _jumpHighlightLineId = lineId;
+    });
+    _jumpHighlightTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted) {
+        setState(() {
+          _jumpHighlightParaId = null;
+          _jumpHighlightLineId = null;
+        });
+      }
+    });
   }
 
   // ── Toolbar actions ──────────────────────────────────────────────────
@@ -328,7 +355,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     _onBookmarkTap(activeTab, _toolbarReaderState(activeTab));
   }
 
-  /// Summarize the current chapter with AI (Vimaṃsa). Shared by the mobile
+  /// Summarize the current chapter with AI (Vīmaṃsā). Shared by the mobile
   /// pill toolbar and the desktop status bar (via [onSummarizeTap]).
   void _handleToolbarSummarize() {
     final activeTab = _toolbarActiveTab();
@@ -1048,6 +1075,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _autoScrollTimer?.cancel();
+    _jumpHighlightTimer?.cancel();
     _settleController.dispose();
     _dragDxNotifier.dispose();
     _appBarCollapsed.dispose();
@@ -1218,6 +1246,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         // position the line at 30% of the viewport. Without a lineId, use a
         // small alignment (5%) so the paragraph isn't flush with the top and
         // hidden behind the app bar / search bar.
+        if (targetLineId != null) {
+          _startJumpHighlight(targetParaId, targetLineId);
+        }
         _scroll.jumpToParagraph(
           activeTab.bookId,
           targetParaId,
@@ -1375,8 +1406,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // to the reader.
     ref.watch(ttsSyncProvider(activeTab.bookId));
 
-    final topPadding = MediaQuery.of(context).padding.top;
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    // Use paddingOf() instead of MediaQuery.of(context) to avoid
+    // rebuilding the entire reader when the keyboard opens/closes.
+    // MediaQuery.of(context) subscribes to ALL fields including viewInsets,
+    // causing the ScrollablePositionedList to re-layout on every keyboard
+    // animation frame (~60fps for ~300ms), which shifts visible text.
+    final topPadding = MediaQuery.paddingOf(context).top;
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
 
     // On tab restore, compute an initial scroll index so the list starts
     // near the saved position instead of flashing to the top of the book
@@ -1650,13 +1686,9 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // held unusually long), and it would pop up over the text now that the
     // sheet is gone. (We intentionally keep [readerLookupHighlightProvider]
     // so the reader sees which word was looked up).
-    ref.listen(dictionarySheetOpenProvider, (previous, next) {
-      if (previous != null && previous > 0 && next <= 0 && mounted) {
-        final region = _selectableRegionKey.currentState;
-        region?.clearSelection();
-        ContextMenuController.removeAny();
-      }
-    });
+    // Sheet cleanup is handled by the sheet-open provider and pointer
+    // handlers; don't register a listener from this frequently rebuilt
+    // content builder.
 
     final lookupHighlight = ref.watch(readerLookupHighlightProvider);
     final activeLookupHighlight = lookupHighlight?.bookId == activeTab.bookId
@@ -1694,6 +1726,8 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       annotations: ref.watch(paragraphAnnotationsProvider(activeTab.bookId)),
       ttsHighlightLineId: ttsHighlightLineId,
       ttsHighlightParaId: ttsHighlightParaId,
+      jumpHighlightLineId: _jumpHighlightLineId,
+      jumpHighlightParaId: _jumpHighlightParaId,
       appBarCollapsed: _appBarCollapsed,
       ttsTargetParaId: ref
           .read(ttsSyncProvider(activeTab.bookId))

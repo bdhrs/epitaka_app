@@ -254,7 +254,7 @@ class ReaderBottomToolbar extends StatelessWidget {
                 : null,
           );
         case ToolbarBuiltins.summarize:
-          // Summarize the current chapter with AI (Vimaṃsa). Rendered
+          // Summarize the current chapter with AI (Vīmaṃsā). Rendered
           // wherever a handler is provided — the mobile pill and the
           // desktop status bar.
           add(

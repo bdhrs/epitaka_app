@@ -13,6 +13,8 @@ import '../../../../core/utils/database_initializer.dart';
 import '../../../annotations/models/annotation.dart';
 import '../index_progress_screen.dart';
 
+const String _bookmarkType = 'bookmark';
+
 /// Tile to reset all app data (bookmarks, history, search index) and
 /// rebuild the index from scratch. Shows a detailed confirmation dialog
 /// with the database file path and an optional export option.
@@ -66,6 +68,7 @@ class ResetDataTile extends ConsumerWidget {
 
     // Determine database path
     final dir = await getDatabaseDirectory();
+    if (!context.mounted) return;
     final dbPath = p.join(dir.path, 'app_data.db');
 
     final confirmed = await showDialog<bool>(
@@ -83,9 +86,7 @@ class ResetDataTile extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                loc.resetConfirmDesc,
-              ),
+              Text(loc.resetConfirmDesc),
               const SizedBox(height: 16),
 
               // DB path
@@ -197,7 +198,7 @@ class ResetDataTile extends ConsumerWidget {
         'exportedAt': DateTime.now().toIso8601String(),
         'appVersion': 'ePitaka',
         'bookmarks': annotations
-            .where((a) => a.type == 'bookmark' && a.deletedAt == null)
+            .where((a) => a.type == _bookmarkType && a.deletedAt == null)
             .map(
               (b) => {
                 'name': b.name,
@@ -212,7 +213,7 @@ class ResetDataTile extends ConsumerWidget {
             )
             .toList(),
         'highlightsAndNotes': annotations
-            .where((a) => a.type != 'bookmark' && a.deletedAt == null)
+            .where((a) => a.type != _bookmarkType && a.deletedAt == null)
             .map(
               (a) => {
                 'id': a.id,

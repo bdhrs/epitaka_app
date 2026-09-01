@@ -2,7 +2,7 @@
 //
 // AI prompt construction for the reader, extracted from reader_screen.dart.
 // The screen (and its context menu) should not know how to query the
-// database or build a long prompt — it only stages one and opens Vimaṃsa AI.
+// database or build a long prompt — it only stages one and opens Vīmaṃsā AI.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -17,7 +17,7 @@ import '../providers/reader_provider.dart';
 import '../providers/reader_tabs_provider.dart';
 import 'reader_copy_service.dart';
 
-/// Builds and stages Vimaṃsa AI prompts from reader context.
+/// Builds and stages Vīmaṃsā AI prompts from reader context.
 class ReaderAiService {
   ReaderAiService._();
 
@@ -28,10 +28,10 @@ class ReaderAiService {
     String prompt,
   ) {
     ref.read(aiQaInitialPromptProvider.notifier).state = prompt;
-    if (context.mounted) context.push('/ai-qa');
+    if (context.mounted) context.pushReplacement('/ai-qa');
   }
 
-  /// Stage an "Explain" prompt for [selectedText] and open Vimaṃsa AI.
+  /// Stage an "Explain" prompt for [selectedText] and open Vīmaṃsā AI.
   ///
   /// Queries the level=10 heading (section title) from the database to give
   /// the AI section context; the AI uses its get_commentaries tool to fetch
@@ -83,7 +83,7 @@ class ReaderAiService {
   }
 
   /// Stage a "Summarize chapter" prompt for the current section and open
-  /// Vimaṃsa AI.
+  /// Vīmaṃsā AI.
   ///
   /// Builds the current chapter/section content — from the nearest heading
   /// at or before [activeTab.currentParaId] up to the next heading (capped

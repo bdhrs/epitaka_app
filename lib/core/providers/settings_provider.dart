@@ -388,7 +388,13 @@ class AppSettings {
   final bool keepScreenOn;
   final double autoScrollSpeed;
   final String ttsEngine;
+  /// Voice for translation lines (system TTS only).
   final String ttsVoice;
+
+  /// Voice for Pāli lines (Hindi/Devanagari system TTS only).
+  /// Separated from [ttsVoice] so users can pick a different Hindi voice
+  /// for Pāli pronunciation vs. the translation language voice.
+  final String ttsPaliVoice;
   final double ttsSpeed;
 
   /// Speech rate for Pāli lines, separate from [ttsSpeed] so Pāli can be
@@ -514,6 +520,7 @@ class AppSettings {
     this.autoScrollSpeed = 60.0,
     this.ttsEngine = 'system',
     this.ttsVoice = 'default',
+    this.ttsPaliVoice = 'default',
     this.ttsSpeed = 1.0,
     this.ttsPaliSpeed = 1.0,
     this.ttsPitch = 1.0,
@@ -563,6 +570,7 @@ class AppSettings {
     double? autoScrollSpeed,
     String? ttsEngine,
     String? ttsVoice,
+    String? ttsPaliVoice,
     double? ttsSpeed,
     double? ttsPaliSpeed,
     double? ttsPitch,
@@ -614,6 +622,7 @@ class AppSettings {
       autoScrollSpeed: autoScrollSpeed ?? this.autoScrollSpeed,
       ttsEngine: ttsEngine ?? this.ttsEngine,
       ttsVoice: ttsVoice ?? this.ttsVoice,
+      ttsPaliVoice: ttsPaliVoice ?? this.ttsPaliVoice,
       ttsSpeed: ttsSpeed ?? this.ttsSpeed,
       ttsPaliSpeed: ttsPaliSpeed ?? this.ttsPaliSpeed,
       ttsPitch: ttsPitch ?? this.ttsPitch,
@@ -918,6 +927,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       autoScrollSpeed: prefs.getDouble('auto_scroll_speed') ?? 60.0,
       ttsEngine: prefs.getString('tts_engine') ?? 'system',
       ttsVoice: prefs.getString('tts_voice') ?? 'default',
+      ttsPaliVoice: prefs.getString('tts_pali_voice') ?? 'default',
       ttsSpeed: prefs.getDouble('tts_speed') ?? 1.0,
       ttsPaliSpeed: prefs.getDouble('tts_pali_speed') ?? 1.0,
       ttsPitch: prefs.getDouble('tts_pitch') ?? 1.0,
@@ -1175,6 +1185,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> setTtsVoice(String voice) async {
     state = state.copyWith(ttsVoice: voice);
     await _prefs?.setString('tts_voice', voice);
+  }
+
+  Future<void> setTtsPaliVoice(String voice) async {
+    state = state.copyWith(ttsPaliVoice: voice);
+    await _prefs?.setString('tts_pali_voice', voice);
   }
 
   Future<void> setTtsSpeed(double speed) async {

@@ -70,7 +70,8 @@ class ReaderScrollController {
     String bookId,
     List<ItemPosition> visible,
     List<ParagraphData> paragraphs,
-  ) onTtsManualScroll;
+  )
+  onTtsManualScroll;
 
   /// Called once per book when a new topmost paragraph first becomes
   /// visible (used by the screen for tab-switch timing + position logs).
@@ -122,12 +123,28 @@ class ReaderScrollController {
   /// doesn't trigger a reader rebuild on every scroll frame.
   final Map<String, double> _preciseScrollOffset = {};
 
+  /// Number of controlled scroll operations currently in progress. A counter
+  /// is used because a search jump can start before a tab-restore callback
+  /// finishes; a boolean would clear too early and leave the app bar stuck.
+  int _controlledScrolls = 0;
+
   /// Whether an initial paragraph jump is in progress (from opening a
-  /// book via history, search result, etc.). While true, the scroll
-  /// collapse logic is suppressed to prevent the app bar/toolbar from
-  /// getting stuck in a collapsed state during position restoration.
+  /// book via history, search result, etc.).
   bool isInitialJumpPending = false;
 
+  void beginControlledScroll() {
+    _controlledScrolls++;
+    suppressAppBarScroll = true;
+    isInitialJumpPending = true;
+  }
+
+  void endControlledScroll() {
+    if (_controlledScrolls > 0) _controlledScrolls--;
+    if (_controlledScrolls == 0) {
+      suppressAppBarScroll = false;
+      isInitialJumpPending = false;
+    }
+  }
 
   /// Suppresses app bar collapse/expand during programmatic scrolls
   /// (TTS jumps, TOC jumps, search result jumps, tab restore, etc.).
@@ -249,27 +266,14 @@ class ReaderScrollController {
     // auto-scroll, TOC jumps, search-result jumps, and Follow-TTS
     // button taps from accidentally hiding/showing the app bar.
     // Only real human finger scrolling should trigger this.
-    if (isInitialJumpPending || suppressAppBarScroll) {
-      developer.log(
-        '[UI_SCROLL] book=$bookId delta=$delta SUPPRESSED by '
-        '_isInitialJumpPending=$isInitialJumpPending '
-        '_suppressAppBarScroll=$suppressAppBarScroll',
-        name: 'epitaka.reader.ui',
-      );
-      return;
-    }
+    if (isInitialJumpPending || suppressAppBarScroll) return;
 
     // Issue 2: Check if at top of document before collapsing
     final positions = _itemPositionsListeners[bookId]?.itemPositions.value;
     if (positions != null && positions.isNotEmpty) {
-      final visible = positions.where((p) => p.itemTrailingEdge > 0).toList()
-        ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
-      if (visible.isNotEmpty && visible.first.index == 0) {
+      final topIndex = _topVisibleIndex(positions);
+      if (topIndex == 0) {
         // At the very top — never collapse
-        developer.log(
-          '[UI_SCROLL] book=$bookId delta=$delta at TOP → force-expand',
-          name: 'epitaka.reader.ui',
-        );
         if (appBarCollapsed.value) appBarCollapsed.value = false;
         _scrollAccum[bookId] = 0;
         return;
@@ -281,29 +285,27 @@ class ReaderScrollController {
     final newAcc = sameDirection ? acc + delta : delta;
 
     if (newAcc > _kScrollThreshold) {
-      developer.log(
-        '[UI_SCROLL] book=$bookId delta=$delta acc=$acc→$newAcc '
-        'COLLAPSE (wasCollapsed=$appBarCollapsed)',
-        name: 'epitaka.reader.ui',
-      );
       _scrollAccum[bookId] = 0;
       if (!appBarCollapsed.value) appBarCollapsed.value = true;
     } else if (newAcc < -_kScrollThreshold) {
-      developer.log(
-        '[UI_SCROLL] book=$bookId delta=$delta acc=$acc→$newAcc '
-        'EXPAND (wasCollapsed=$appBarCollapsed)',
-        name: 'epitaka.reader.ui',
-      );
       _scrollAccum[bookId] = 0;
       if (appBarCollapsed.value) appBarCollapsed.value = false;
     } else {
-      developer.log(
-        '[UI_SCROLL] book=$bookId delta=$delta dir=${delta > 0 ? "down" : "up"} '
-        'acc=$acc→$newAcc sameDir=$sameDirection',
-        name: 'epitaka.reader.ui',
-      );
       _scrollAccum[bookId] = newAcc;
     }
+  }
+
+  int _topVisibleIndex(Iterable<ItemPosition> positions) {
+    var topIndex = -1;
+    var topLeading = double.infinity;
+    for (final position in positions) {
+      if (position.itemTrailingEdge <= 0) continue;
+      if (position.itemLeadingEdge < topLeading) {
+        topLeading = position.itemLeadingEdge;
+        topIndex = position.index;
+      }
+    }
+    return topIndex;
   }
 
   // ── Position tracking, silverbar, pagination ─────────────────────────
@@ -350,10 +352,14 @@ class ReaderScrollController {
     // The item with the smallest (most negative/zero) leading edge that's
     // still at least partially visible (trailingEdge > 0) is the topmost
     // visible item.
-    final visible = positions.where((p) => p.itemTrailingEdge > 0).toList()
-      ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
+    final topIndex = _topVisibleIndex(positions);
+    if (topIndex < 0) return;
+    final visible = positions.where((p) => p.itemTrailingEdge > 0).toList();
     if (visible.isEmpty) return;
-    final topIndex = visible.first.index;
+    // ItemPositionsListener normally has only a handful of entries; keep
+    // this allocation limited to the position-tracking path, not every
+    // pixel-offset callback.
+    visible.sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
     // Fractional scroll offset: the topmost item's index plus its leading
     // edge (negative when scrolled *down* within the item). This captures
     // the within-paragraph offset so restoration can be exact instead of
@@ -452,7 +458,7 @@ class ReaderScrollController {
     int retryCount = 0,
   }) async {
     // Suppress app bar during this programmatic scroll
-    suppressAppBarScroll = true;
+    beginControlledScroll();
 
     _pendingJumpParaId[bookId] = paraId;
     final int jumpToken = (_jumpTokens[bookId] ?? 0) + 1;
@@ -478,8 +484,7 @@ class ReaderScrollController {
             name: 'epitaka.reader',
           );
           _pendingJumpParaId.remove(bookId);
-          isInitialJumpPending = false;
-          suppressAppBarScroll = false;
+          endControlledScroll();
           return;
         }
         if (!isMounted()) return;
@@ -494,8 +499,7 @@ class ReaderScrollController {
           name: 'epitaka.reader',
         );
         _pendingJumpParaId.remove(bookId);
-        isInitialJumpPending = false;
-        suppressAppBarScroll = false;
+        endControlledScroll();
         return;
       }
     }
@@ -513,6 +517,8 @@ class ReaderScrollController {
           'after $maxRetries retries — giving up',
           name: 'epitaka.reader.ui',
         );
+        _pendingJumpParaId.remove(bookId);
+        endControlledScroll();
         return;
       }
       developer.log(
@@ -530,7 +536,9 @@ class ReaderScrollController {
           lineId: lineId,
           retryCount: retryCount + 1,
         ).then((_) {
-          if (isMounted()) isInitialJumpPending = false;
+          if (isMounted()) {
+            endControlledScroll();
+          }
         });
       });
       return;
@@ -635,8 +643,7 @@ class ReaderScrollController {
             '[JUMP] book=$bookId clearing _isInitialJumpPending',
             name: 'epitaka.reader.ui',
           );
-          isInitialJumpPending = false;
-          suppressAppBarScroll = false;
+          endControlledScroll();
         }
       });
     }
@@ -770,8 +777,10 @@ class ReaderScrollController {
       double totalTrans = 0.0;
       for (var i = 0; i < para.lines.length; i++) {
         final line = para.lines[i];
-        final pChars =
-            (line.paliText?.length ?? 0).toDouble().clamp(20.0, 10000.0);
+        final pChars = (line.paliText?.length ?? 0).toDouble().clamp(
+          20.0,
+          10000.0,
+        );
         if (i < lineIndex) cumPali += pChars;
         totalPali += pChars;
 
@@ -785,10 +794,12 @@ class ReaderScrollController {
         if (i < lineIndex) cumTrans += tChars;
         totalTrans += tChars;
       }
-      final paliFrac =
-          totalPali > 0 ? cumPali / totalPali : lineIndex / para.lines.length;
-      final transFrac =
-          totalTrans > 0 ? cumTrans / totalTrans : lineIndex / para.lines.length;
+      final paliFrac = totalPali > 0
+          ? cumPali / totalPali
+          : lineIndex / para.lines.length;
+      final transFrac = totalTrans > 0
+          ? cumTrans / totalTrans
+          : lineIndex / para.lines.length;
       return ((paliFrac + transFrac) / 2.0).clamp(0.0, 1.0);
     }
 
@@ -903,8 +914,10 @@ class ReaderScrollController {
     // paragraphs when translations are enabled).
     final minAlignment = (0.3 - span).clamp(-100.0, 0.3);
     const maxAlignment = 0.3;
-    final targetAlignment =
-        (0.3 - lineFraction * span).clamp(minAlignment, maxAlignment);
+    final targetAlignment = (0.3 - lineFraction * span).clamp(
+      minAlignment,
+      maxAlignment,
+    );
 
     debugPrint(
       '[JUMP-GEO] book=$bookId line=$lineId lineIndex=$lineIndex '
@@ -913,12 +926,19 @@ class ReaderScrollController {
       'trailing=${pos.itemTrailingEdge.toStringAsFixed(3)} '
       'span=${span.toStringAsFixed(3)}',
     );
-    _itemScrollControllers[bookId]?.scrollTo(
-      index: paraIndex,
-      alignment: targetAlignment,
-      duration: const Duration(milliseconds: 150),
-      curve: Curves.easeOut,
-    ).whenComplete(finish);
+    final controller = _itemScrollControllers[bookId];
+    if (controller == null) {
+      finish();
+      return;
+    }
+    controller
+        .scrollTo(
+          index: paraIndex,
+          alignment: targetAlignment,
+          duration: const Duration(milliseconds: 150),
+          curve: Curves.easeOut,
+        )
+        .whenComplete(finish);
   }
 
   /// Clears the initial-jump pending flag and app-bar scroll suppression
@@ -928,12 +948,7 @@ class ReaderScrollController {
   void _finishJumpFlags(String bookId, int jumpToken) {
     if (!isMounted()) return;
     if (_jumpTokens[bookId] != jumpToken) return;
-    developer.log(
-      '[JUMP] book=$bookId clearing _isInitialJumpPending (fine-scroll done)',
-      name: 'epitaka.reader.ui',
-    );
-    isInitialJumpPending = false;
-    suppressAppBarScroll = false;
+    endControlledScroll();
   }
 
   /// Get the paraId of the paragraph the user is actually reading: the first
@@ -941,8 +956,7 @@ class ReaderScrollController {
   /// viewport top). See [getCurrentParaId] for why 0.0 rather than the
   /// topmost visible paragraph.
   int? currentParaId(String bookId) {
-    final positions =
-        _itemPositionsListeners[bookId]?.itemPositions.value;
+    final positions = _itemPositionsListeners[bookId]?.itemPositions.value;
     final readerState = ref.read(readerDataProvider(bookId));
     return getCurrentParaId(positions, readerState, threshold: 0.0);
   }

@@ -144,7 +144,7 @@ class SettingsScreen extends ConsumerWidget {
 
           const SizedBox(height: AppDimensions.md),
 
-          // ── Vimaṃsa (AI Q&A + Gavesana) ────────────────────────────
+          // ── Vīmaṃsā (AI Q&A + Gavesana) ────────────────────────────
           const SettingsAiSection(),
 
           const SizedBox(height: AppDimensions.md),
@@ -211,9 +211,9 @@ class SettingsSearchSection extends ConsumerWidget {
   }
 }
 
-/// Vimaṃsa (AI Q&A) + Gavesana (AI search) settings section.
+/// Vīmaṃsā (AI Q&A) + Gavesana (AI search) settings section.
 ///
-/// Gavesana runs on the cloud AI (same settings as Vimaṃsa), so both share
+/// Gavesana runs on the cloud AI (same settings as Vīmaṃsā), so both share
 /// a single configuration — one tile opens the shared AI settings sheet;
 /// no on-device asset downloads anymore.
 class SettingsAiSection extends ConsumerWidget {

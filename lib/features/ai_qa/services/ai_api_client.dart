@@ -1,5 +1,5 @@
 /// Shared AI API client, tool declarations and the tool-calling loop engine
-/// used by both the Vimaṃsa (AI Q&A) chat and the Gavesana AI search.
+/// used by both the Vīmaṃsā (AI Q&A) chat and the Gavesana AI search.
 ///
 /// Everything that talks to the AI provider (Gemini / OpenAI-compatible) and
 /// everything that drives the function-calling loop lives here so the two
@@ -41,7 +41,7 @@ const int kTranslatorMaxOutputTokens = 65000;
 
 /// Shared function declarations (tools) for AI tool calling.
 ///
-/// Used by both Vimaṃsa and Gavesana so the model can decide how to search
+/// Used by both Vīmaṃsā and Gavesana so the model can decide how to search
 /// the Tipitaka using the same local database tools.
 final List<Map<String, dynamic>> kAiToolDeclarations = [
   {
@@ -344,8 +344,9 @@ final List<Map<String, dynamic>> kAiToolDeclarations = [
   },
 ];
 
-/// Default system prompt for the Vimaṃsa tool model (chat + Q&A).
-const String kAiDefaultToolSystemPrompt = '''You are an expert research assistant for the Pāli Canon (Tipitaka).
+/// Default system prompt for the Vīmaṃsā tool model (chat + Q&A).
+const String kAiDefaultToolSystemPrompt =
+    '''You are an expert research assistant for the Pāli Canon (Tipitaka).
 
 ## Available tools
 1. **search_sections(query)** — Search section/sutta TITLES across the whole canon (not full text). Use this FIRST for concept questions to discover WHICH suttas discuss a topic, then open them with get_paragraph_content or get_section.
@@ -415,6 +416,22 @@ After each search batch, evaluate:
 - Use get_headings to understand the structure of a promising book before diving in.
 - Only call final_answer when you have found passages that DIRECTLY address the user's question.
 
+## CRITICAL: Pāli search stem generation
+When searching for a Pāli term, ALWAYS strip the final vowel to create a stem that matches all declension forms.
+- Example: "buddha" → search "buddh" (matches buddhena, buddho, buddhā, buddhassa, etc.)
+- Example: "dhamma" → search "dhamm" (matches dhammaṃ, dhammā, dhammassa, etc.)
+- Example: "sacca" → search "sacc" (matches saccaṃ, saccā, saccessa, etc.)
+- Example: "mettā" → search "mett" (matches mettā, mettāya, mettavā, etc.)
+- Exception: terms ending in consonants or -i/-u already (e.g. "pāli", "cakkhu") keep the final vowel — only strip -a/-ā endings.
+- For English search terms, do NOT strip — use the full word as-is.
+- This applies to ALL search tools: search_tipitaka, search_tipitaka_batch, search_by_category, and search_sections.
+
+## CRITICAL: Referencing suttas and books
+- NEVER use book_id codes (e.g. "An35.2", "SN22.1", "MN1") in search queries — these short-form identifiers are NOT searchable in the RAG index.
+- To search for a specific sutta, use the FULL SUTTA NAME (without the final vowel for Pāli): e.g. for Sabbāsava Sutta, search "sabbāsav" not "An35.2" or "Sabbasav".
+- To find a specific book, use get_books() to list all available books and find the correct book_id, then use get_headings(book_id) to browse its table of contents and locate the desired section by para_start.
+- When the user asks about a specific sutta by Pāli name, combine the sutta name stem with a topical term for a targeted search.
+
 ## Guidelines
 - When searching, use search_tipitaka_batch or search_by_category (not single search).
 - When explaining several Pāli terms, batch them with get_dictionary_batch(terms) in ONE call — never call get_dictionary once per term (each call costs an API round-trip).
@@ -427,7 +444,8 @@ After each search batch, evaluate:
 ///
 /// The model plans and runs the searches (up to 10 tool calls); the passages
 /// it collects are rendered as normal search results.
-const String kAiSearchSystemPrompt = '''You are a search planner for the Pāli Canon (Tipitaka).
+const String kAiSearchSystemPrompt =
+    '''You are a search planner for the Pāli Canon (Tipitaka).
 
 The user wants to FIND passages in the Tipitaka relevant to their request. Your job is to search the local database using the available tools and collect the most relevant passages — you do NOT need to write an answer or explain anything.
 
@@ -442,6 +460,22 @@ The user wants to FIND passages in the Tipitaka relevant to their request. Your 
 8. **get_headings(book_id)** — Table of contents for a book.
 9. **get_paragraph_content(book_id, para_start, para_end)** — Read Pāli text.
 10. **get_paragraph_content_batch(ranges: [...])** — Read multiple ranges in parallel.
+
+## CRITICAL: Pāli search stem generation
+When searching for a Pāli term, ALWAYS strip the final vowel to create a stem that matches all declension forms.
+- Example: "buddha" → search "buddh" (matches buddhena, buddho, buddhā, buddhassa, etc.)
+- Example: "dhamma" → search "dhamm" (matches dhammaṃ, dhammā, dhammassa, etc.)
+- Example: "sacca" → search "sacc" (matches saccaṃ, saccā, saccessa, etc.)
+- Example: "mettā" → search "mett" (matches mettā, mettāya, mettavā, etc.)
+- Exception: terms ending in consonants or -i/-u already (e.g. "pāli", "cakkhu") keep the final vowel — only strip -a/-ā endings.
+- For English search terms, do NOT strip — use the full word as-is.
+- This applies to ALL search tools: search_tipitaka, search_tipitaka_batch, search_by_category, and search_sections.
+
+## CRITICAL: Referencing suttas and books
+- NEVER use book_id codes (e.g. "An35.2", "SN22.1", "MN1") in search queries — these short-form identifiers are NOT searchable in the RAG index.
+- To search for a specific sutta, use the FULL SUTTA NAME (without the final vowel for Pāli): e.g. for Sabbāsava Sutta, search "sabbāsav" not "An35.2" or "Sabbasav".
+- To find a specific book, use get_books() to list all available books and find the correct book_id, then use get_headings(book_id) to browse its table of contents and locate the desired section by para_start.
+- When the user asks about a specific sutta by Pāli name, combine the sutta name stem with a topical term for a targeted search.
 
 ## Strategy
 - Analyze the request: what is unique/specific about it, and where in the canon would the answer live?
@@ -517,7 +551,7 @@ class AiApiClient {
           model: toolModel,
           apiKey: apiKey,
           baseUrl: baseUrl.isNotEmpty ? baseUrl : provider.defaultBaseUrl,
-          payload: payload,
+          payload: {...payload, 'model': toolModel},
           logTag: logTag,
         );
         return jsonDecode(response) as Map<String, dynamic>;
@@ -584,8 +618,6 @@ class AiApiClient {
         return _extractGeminiText(data);
       case AiProvider.openai:
       case AiProvider.openrouter:
-        final effectiveBase =
-            baseUrl.isNotEmpty ? baseUrl : provider.defaultBaseUrl;
         final payload = {
           'model': model,
           'messages': [
@@ -598,7 +630,7 @@ class AiApiClient {
         final response = await _callOpenAiApiRaw(
           model: model,
           apiKey: apiKey,
-          baseUrl: effectiveBase,
+          baseUrl: baseUrl.isNotEmpty ? baseUrl : provider.defaultBaseUrl,
           payload: payload,
           logTag: logTag,
           cancelSignal: cancelSignal,
@@ -669,7 +701,8 @@ class AiApiClient {
     if (start != -1 && end > start) {
       try {
         final obj =
-            jsonDecode(cleaned.substring(start, end + 1)) as Map<String, dynamic>;
+            jsonDecode(cleaned.substring(start, end + 1))
+                as Map<String, dynamic>;
         for (final key in keys) {
           obj.putIfAbsent(key, () => <dynamic>[]);
         }
@@ -679,9 +712,7 @@ class AiApiClient {
       }
     }
 
-    final obj = <String, dynamic>{
-      for (final key in keys) key: <dynamic>[],
-    };
+    final obj = <String, dynamic>{for (final key in keys) key: <dynamic>[]};
     for (final key in keys) {
       final m = RegExp('"$key"\\s*:\\s*\\[').firstMatch(cleaned);
       if (m == null) continue;
@@ -772,6 +803,7 @@ class AiApiClient {
         }).toList();
 
         return {
+          'model': '',
           'messages': messages,
           'tools': openaiTools,
           'tool_choice': 'auto',
@@ -820,18 +852,23 @@ class AiApiClient {
           throw Exception('Rate limit exceeded. Try again later.');
         } else {
           if (attempt < kAiMaxRetries) {
-            await _raceCancel(Future.delayed(const Duration(seconds: 2)), cancelSignal);
+            await _raceCancel(
+              Future.delayed(const Duration(seconds: 2)),
+              cancelSignal,
+            );
             continue;
           }
-          throw Exception(
-            'API error ${httpResponse.statusCode}: ${parseApiError(httpResponse.body)}',
-          );
+          final apiMessage = parseApiError(httpResponse.body);
+          throw Exception('API error ${httpResponse.statusCode}: $apiMessage');
         }
       } on AiCallCancelledException {
         rethrow; // Never retry after a user cancel.
       } on http.ClientException {
         if (attempt < kAiMaxRetries) {
-          await _raceCancel(Future.delayed(const Duration(seconds: 2)), cancelSignal);
+          await _raceCancel(
+            Future.delayed(const Duration(seconds: 2)),
+            cancelSignal,
+          );
           continue;
         }
         rethrow;
@@ -839,7 +876,10 @@ class AiApiClient {
         // A slow (not hung) request shouldn't kill the run — retry, and
         // only give up once every attempt has timed out.
         if (attempt < kAiMaxRetries) {
-          await _raceCancel(Future.delayed(const Duration(seconds: 2)), cancelSignal);
+          await _raceCancel(
+            Future.delayed(const Duration(seconds: 2)),
+            cancelSignal,
+          );
           continue;
         }
         throw Exception('API request timed out after $timeout');
@@ -862,8 +902,7 @@ class AiApiClient {
     Future<void>? cancelSignal,
     Duration timeout = const Duration(minutes: 10),
   }) async {
-    final effectiveBase = baseUrl.isNotEmpty ? baseUrl : 'https://api.openai.com/v1';
-    final url = Uri.parse('$effectiveBase/chat/completions');
+    final url = _chatCompletionsUri(baseUrl);
 
     for (int attempt = 0; attempt <= kAiMaxRetries; attempt++) {
       try {
@@ -891,7 +930,8 @@ class AiApiClient {
           final data = jsonDecode(httpResponse.body) as Map<String, dynamic>;
           final choices = data['choices'] as List<dynamic>? ?? [];
           if (choices.isNotEmpty) {
-            final message = choices[0]['message'] as Map<String, dynamic>? ?? {};
+            final message =
+                choices[0]['message'] as Map<String, dynamic>? ?? {};
             final content = message['content'] as String? ?? '';
             final toolCalls = message['tool_calls'] as List<dynamic>?;
 
@@ -906,7 +946,9 @@ class AiApiClient {
                 parts.add({
                   'functionCall': {
                     'name': tcMap['function']['name'],
-                    'args': jsonDecode(tcMap['function']['arguments'] as String),
+                    'args': jsonDecode(
+                      tcMap['function']['arguments'] as String,
+                    ),
                   },
                 });
               }
@@ -932,24 +974,32 @@ class AiApiClient {
           throw Exception('Rate limit exceeded. Try again later.');
         } else {
           if (attempt < kAiMaxRetries) {
-            await _raceCancel(Future.delayed(const Duration(seconds: 2)), cancelSignal);
+            await _raceCancel(
+              Future.delayed(const Duration(seconds: 2)),
+              cancelSignal,
+            );
             continue;
           }
-          throw Exception(
-            'API error ${httpResponse.statusCode}: ${parseApiError(httpResponse.body)}',
-          );
+          final apiMessage = parseApiError(httpResponse.body);
+          throw Exception('API error ${httpResponse.statusCode}: $apiMessage');
         }
       } on AiCallCancelledException {
         rethrow; // Never retry after a user cancel.
       } on http.ClientException {
         if (attempt < kAiMaxRetries) {
-          await _raceCancel(Future.delayed(const Duration(seconds: 2)), cancelSignal);
+          await _raceCancel(
+            Future.delayed(const Duration(seconds: 2)),
+            cancelSignal,
+          );
           continue;
         }
         rethrow;
       } on TimeoutException {
         if (attempt < kAiMaxRetries) {
-          await _raceCancel(Future.delayed(const Duration(seconds: 2)), cancelSignal);
+          await _raceCancel(
+            Future.delayed(const Duration(seconds: 2)),
+            cancelSignal,
+          );
           continue;
         }
         throw Exception('API request timed out after $timeout');
@@ -959,13 +1009,29 @@ class AiApiClient {
     throw Exception('API call failed after $kAiMaxRetries retries');
   }
 
+  /// Resolve a provider base URL to its chat-completions endpoint.
+  /// Accept both `https://host/v1` and a URL already ending in
+  /// `/chat/completions`; this avoids producing `/chat/completions/chat/completions`
+  /// when users paste a full DeepSeek endpoint.
+  static Uri _chatCompletionsUri(String baseUrl) {
+    var value = baseUrl.trim();
+    if (value.isEmpty) value = 'https://api.openai.com/v1';
+    while (value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    if (value.endsWith('/chat/completions')) return Uri.parse(value);
+    return Uri.parse('$value/chat/completions');
+  }
+
   /// Extract a human-readable error message from an API error body.
   static String parseApiError(String body) {
     try {
       final data = jsonDecode(body) as Map<String, dynamic>;
       final error = data['error'] as Map<String, dynamic>?;
       if (error != null) {
-        return error['message'] as String? ?? error['status'] as String? ?? body;
+        return error['message'] as String? ??
+            error['status'] as String? ??
+            body;
       }
       return body;
     } on FormatException {
@@ -982,8 +1048,13 @@ class AiApiClient {
     if (statusMatch != null) {
       switch (statusMatch.group(1)) {
         case '400':
-          return 'The AI service rejected the request (400). The question may '
-              'be too long or contain unsupported content. Try asking again.';
+          final detail = raw.contains(': ')
+              ? raw.substring(raw.indexOf(': ') + 2).trim()
+              : '';
+          return detail.isNotEmpty
+              ? 'The AI service rejected the request (400): $detail'
+              : 'The AI service rejected the request (400). Check the model, '
+                    'endpoint, and request format.';
         case '401':
         case '403':
           return 'Your API key was rejected (${statusMatch.group(1)}). '
@@ -1024,7 +1095,11 @@ class AiApiClient {
 }
 
 /// Build a short human-readable summary of a tool call for UI logs.
-String buildToolLogSummary(String name, Map<String, dynamic> args, ToolResult result) {
+String buildToolLogSummary(
+  String name,
+  Map<String, dynamic> args,
+  ToolResult result,
+) {
   if (!result.success) {
     return '❌ ${result.errorMessage ?? "Unknown error"}';
   }
@@ -1050,23 +1125,34 @@ String buildToolLogSummary(String name, Map<String, dynamic> args, ToolResult re
   switch (name) {
     case 'search_tipitaka':
       final query = args['query'] as String? ?? '';
-      final queryShort = query.length > 40 ? '${query.substring(0, 40)}…' : query;
+      final queryShort = query.length > 40
+          ? '${query.substring(0, 40)}…'
+          : query;
       if (resultCount > 0) {
         return '🔍 "$queryShort" → $resultCount results';
       }
       return '🔍 "$queryShort" (${result.data.length} chars)';
     case 'search_tipitaka_batch':
       final queries =
-          (args['queries'] as List<dynamic>?)?.map((q) => q.toString()).toList() ?? [];
+          (args['queries'] as List<dynamic>?)
+              ?.map((q) => q.toString())
+              .toList() ??
+          [];
       final queriesStr = queries
           .map((q) => q.length > 20 ? '${q.substring(0, 20)}…' : q)
           .join(', ');
       return '🔍 Batch[$resultCount results] ($queriesStr)';
     case 'search_by_category':
       final cats =
-          (args['categories'] as List<dynamic>?)?.map((c) => c.toString()).toList() ?? [];
+          (args['categories'] as List<dynamic>?)
+              ?.map((c) => c.toString())
+              .toList() ??
+          [];
       final niks =
-          (args['nikayas'] as List<dynamic>?)?.map((n) => n.toString()).toList() ?? [];
+          (args['nikayas'] as List<dynamic>?)
+              ?.map((n) => n.toString())
+              .toList() ??
+          [];
       final scope = [...cats, ...niks];
       final scopeStr = scope.isEmpty ? 'all' : scope.join(', ');
       return '🔍 $scopeStr[$resultCount results]';
@@ -1081,7 +1167,8 @@ String buildToolLogSummary(String name, Map<String, dynamic> args, ToolResult re
       final term = args['term'] as String? ?? '';
       return '📖 "$term" → $resultCount entries';
     case 'get_dictionary_batch':
-      final terms = (args['terms'] as List<dynamic>?)
+      final terms =
+          (args['terms'] as List<dynamic>?)
               ?.map((t) => t.toString())
               .toList() ??
           [];
@@ -1183,7 +1270,7 @@ Future<AiToolLoopResult> runAiToolLoop({
   required String systemPrompt,
   required List<Map<String, dynamic>> initialConversation,
   required Future<ToolResult> Function(String name, Map<String, dynamic> args)
-      executeTool,
+  executeTool,
   void Function(List<ToolCallLog> logs)? onToolUpdate,
   int maxIterations = 8,
   String logTag = 'AI',
@@ -1294,7 +1381,9 @@ Future<AiToolLoopResult> runAiToolLoop({
           resultSummary: summary,
         );
 
-        final resultData = result.success ? result.data : 'Error: ${result.errorMessage}';
+        final resultData = result.success
+            ? result.data
+            : 'Error: ${result.errorMessage}';
         final maxChars = settings.maxToolResultChars;
         final truncatedData = maxChars > 0 && resultData.length > maxChars
             ? '${resultData.substring(0, maxChars)}\n... (truncated to $maxChars chars)'
@@ -1331,7 +1420,8 @@ Future<AiToolLoopResult> runAiToolLoop({
         'functionResponse': {
           'name': 'final_answer',
           'response': {
-            'content': 'Proceeding to generate final answer with collected data.',
+            'content':
+                'Proceeding to generate final answer with collected data.',
           },
         },
       });

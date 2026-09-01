@@ -343,7 +343,7 @@ class AppShortcuts {
     ),
     ShortcutBinding(
       id: 'vimamsa',
-      label: 'Vimaṃsa',
+      label: 'Vīmaṃsā',
       activators: [
         SingleActivator(LogicalKeyboardKey.keyV, control: true, shift: true),
         SingleActivator(LogicalKeyboardKey.keyV, meta: true, shift: true),
@@ -518,7 +518,7 @@ class AppShortcuts {
       if (ResponsiveBreakpoint.isDesktop(context)) {
         // Desktop: toggle the docked sidebar panel / right column.
         final sidePanels = ref.read(sidePanelProvider);
-        if (sidePanels.right.openPanel == SidePanelType.dictionary) {
+        if (sidePanels.left.openPanel == SidePanelType.dictionary) {
           ref.read(sidePanelProvider.notifier).close(SidePanelType.dictionary);
         } else {
           ref

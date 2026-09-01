@@ -1,6 +1,6 @@
 /// Markdown rendering with tappable `[book:para:line]` citations.
 ///
-/// Extracted from the Vimaṃsa (AI Q&A) chat bubble so other features — e.g.
+/// Extracted from the Vīmaṃsā (AI Q&A) chat bubble so other features — e.g.
 /// the outline's study-guide view — render the same markdown the same way,
 /// turning every citation into a chip the user can tap to preview the
 /// quoted passage.
@@ -10,25 +10,32 @@ import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:markdown/markdown.dart' as md;
 
-/// Custom inline syntax that matches [book_id:para_id:line_id] citations.
+/// Custom inline syntax that matches [book_id:para_id:line_id] and
+/// [book_id:para_id:line_from-line_to] citations.
+/// Range separator can be either a hyphen (-) or an en-dash (–).
 class CitationInlineSyntax extends md.InlineSyntax {
-  CitationInlineSyntax() : super(r'\[([a-zA-Z0-9_.-]+):(\d+):(\d+)(?:-(\d+))?\]');
+  CitationInlineSyntax() : super(r'\[([a-zA-Z0-9_.-]+):(\d+):(\d+)(?:[-\u2013](\d+))?\]');
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
     final bookId = match.group(1)!;
     final paraId = match.group(2)!;
-    // Use the first line_id; ignore the optional range end.
     final lineId = match.group(3)!;
-    parser.addNode(md.Element.text('citation', '$bookId:$paraId:$lineId'));
+    final lineIdTo = match.group(4); // optional range end
+    final ref = lineIdTo != null
+        ? '$bookId:$paraId:$lineId-$lineIdTo'
+        : '$bookId:$paraId:$lineId';
+    parser.addNode(md.Element.text('citation', ref));
     return true;
   }
 }
 
 /// Custom Markdown widget builder that renders citation elements as
-/// clickable inline chips.
+/// clickable inline chips.  Supports both single-line and range
+/// citations ([book:para:line] and [book:para:line_from-line_to]).
 class CitationMarkdownBuilder extends MarkdownElementBuilder {
-  final void Function(String bookId, int paraId, int lineId) onCitationTap;
+  final void Function(String bookId, int paraId, int lineId, {int? lineIdTo})
+      onCitationTap;
 
   CitationMarkdownBuilder({required this.onCitationTap});
 
@@ -40,11 +47,26 @@ class CitationMarkdownBuilder extends MarkdownElementBuilder {
     if (parts.length < 3) return null;
     final bookId = parts[0];
     final paraId = int.tryParse(parts[1]) ?? 0;
-    final lineId = int.tryParse(parts[2]) ?? 1;
+
+    // The line part may be a single id or a range "from-to".
+    final linePart = parts[2];
+    final dashIdx = linePart.indexOf('-');
+    final int lineId;
+    final int? lineIdTo;
+    if (dashIdx >= 0) {
+      lineId = int.tryParse(linePart.substring(0, dashIdx)) ?? 1;
+      lineIdTo = int.tryParse(linePart.substring(dashIdx + 1));
+    } else {
+      lineId = int.tryParse(linePart) ?? 1;
+      lineIdTo = null;
+    }
 
     final color = preferredStyle?.color ?? Colors.blue;
+    final label = lineIdTo != null
+        ? '$bookId §$paraId:$lineId-$lineIdTo'
+        : '$bookId §$paraId:$lineId';
     return GestureDetector(
-      onTap: () => onCitationTap(bookId, paraId, lineId),
+      onTap: () => onCitationTap(bookId, paraId, lineId, lineIdTo: lineIdTo),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
         margin: const EdgeInsets.symmetric(horizontal: 2),
@@ -59,7 +81,7 @@ class CitationMarkdownBuilder extends MarkdownElementBuilder {
             Icon(Icons.format_quote, size: 10, color: color),
             const SizedBox(width: 2),
             Text(
-              '$bookId §$paraId:$lineId',
+              label,
               style: TextStyle(
                 color: color,
                 fontSize: 11,
@@ -74,14 +96,15 @@ class CitationMarkdownBuilder extends MarkdownElementBuilder {
   }
 }
 
-/// Renders [data] as markdown with [book:para:line] citations turned into
-/// tappable chips ([onCitationTap]). Wrapped in a [SelectionArea] so the
-/// reader can copy passages.
+/// Renders [data] as markdown with [book:para:line] (and range) citations
+/// turned into tappable chips ([onCitationTap]). Wrapped in a
+/// [SelectionArea] so the reader can copy passages.
 class AiMarkdownView extends StatelessWidget {
   final String data;
 
   /// Called when a citation chip is tapped.
-  final void Function(String bookId, int paraId, int lineId) onCitationTap;
+  final void Function(String bookId, int paraId, int lineId, {int? lineIdTo})
+      onCitationTap;
 
   const AiMarkdownView({
     super.key,

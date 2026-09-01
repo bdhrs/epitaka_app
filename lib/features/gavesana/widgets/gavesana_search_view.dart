@@ -67,13 +67,17 @@ class _GavesanaSearchViewState extends ConsumerState<GavesanaSearchView> {
 
   /// Applies Velthuis conversion on-the-fly while typing (same behavior as
   /// the regular search boxes): `dhamma.m` becomes `dhammaṃ`, `raaga`
-  /// becomes `rāga`, and any non-Roman script is converted to IAST Roman.
+  /// becomes `rāga`.  Non-Roman scripts (Sinhala, Thai, Myanmar, …) are
+  /// left untouched in the display so the user keeps seeing their native
+  /// script; the search still receives the Roman-converted result.
   void _onSearchChanged(String value) {
     // Prevent re-entry when updating the controller text after conversion.
     if (_isConverting) return;
 
     final converted = velthuis(value);
-    if (converted != value && converted.trim().isNotEmpty) {
+    if (isRomanScript(value) &&
+        converted != value &&
+        converted.trim().isNotEmpty) {
       _isConverting = true;
       _queryController.value = convertedTextEditingValue(
         _queryController.value,
@@ -121,7 +125,7 @@ class _GavesanaSearchViewState extends ConsumerState<GavesanaSearchView> {
             children: [
               Expanded(child: _buildSearchField(colors, loc)),
               const SizedBox(width: 4),
-              // AI settings — the same sheet used by Vimaṃsa (API key,
+              // AI settings — the same sheet used by Vīmaṃsā (API key,
               // model). Lives here (not an AppBar) so the sidebar panel
               // gets it too.
               IconButton(

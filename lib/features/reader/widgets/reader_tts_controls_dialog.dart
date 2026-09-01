@@ -138,6 +138,9 @@ class _TtsControlsDialogState extends ConsumerState<_TtsControlsDialog> {
                   onVoiceChanged: (voice) {
                     ref.read(settingsProvider.notifier).setTtsVoice(voice);
                   },
+                  onPaliVoiceChanged: (voice) {
+                    ref.read(settingsProvider.notifier).setTtsPaliVoice(voice);
+                  },
                   onSpeakModeChanged: widget.onSpeakModeChanged,
                   onInstallVoiceTap: () => openSystemTtsSettings(ctx),
                   onSystemConfigTap: () {

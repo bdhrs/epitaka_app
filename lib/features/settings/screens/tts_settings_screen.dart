@@ -49,6 +49,9 @@ class TtsSettingsBody extends ConsumerStatefulWidget {
 }
 
 class _TtsSettingsBodyState extends ConsumerState<TtsSettingsBody> {
+  List<Map<String, String>>? _cachedVoices;
+  bool _voicesLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -59,7 +62,20 @@ class _TtsSettingsBodyState extends ConsumerState<TtsSettingsBody> {
           ref.read(settingsProvider.notifier).setTtsSupertonicDownloaded(true);
         }
       });
+      _loadVoices();
     });
+  }
+
+  Future<void> _loadVoices() async {
+    if (_cachedVoices != null || _voicesLoading) return;
+    setState(() => _voicesLoading = true);
+    try {
+      final voices = await ref.read(ttsProvider.notifier).getVoices();
+      if (mounted) setState(() => _cachedVoices = voices);
+    } catch (_) {
+      // Silently fail — voice pickers will show defaults
+    }
+    if (mounted) setState(() => _voicesLoading = false);
   }
 
   @override
@@ -309,68 +325,91 @@ class _TtsSettingsBodyState extends ConsumerState<TtsSettingsBody> {
             ],
           ],
 
-          // ── System TTS voice ─────────────────────────────────────────
+          // ── Pāli speed + voice ────────────────────────────────────────
           if (!isSupertonic) ...[
             SettingsSection(
-              title: loc.ttsVoiceLabel,
+              title: loc.ttsPaliSpeed,
               colors: colors,
               children: [
-                _DropdownTile(
-                  icon: Icons.record_voice_over,
-                  title: loc.ttsVoiceLabel,
-                  value: _voiceLabel(settings.ttsVoice),
-                  options: _voiceOptions.map((o) => o.$2).toList(),
-                  selectedValue: _voiceLabel(settings.ttsVoice),
-                  onSelected: (label) {
-                    final entry = _voiceOptions.firstWhere(
-                      (o) => o.$2 == label,
-                      orElse: () => ('default', 'System Default'),
-                    );
-                    ref.read(settingsProvider.notifier).setTtsVoice(entry.$1);
-                  },
+                _SpeedSlider(
+                  value: settings.ttsPaliSpeed,
+                  min: 0.1,
+                  max: 3.0,
+                  // 29 divisions → clean 0.1 steps across the 0.1–3.0 range.
+                  divisions: 29,
+                  label: '${settings.ttsPaliSpeed.toStringAsFixed(1)}×',
                   colors: colors,
+                  onChanged: (v) {
+                    ref.read(settingsProvider.notifier).setTtsPaliSpeed(v);
+                  },
+                ),
+                const Divider(
+                  height: 1,
+                  indent: AppDimensions.md,
+                  endIndent: AppDimensions.md,
+                ),
+                // Pāli voice (Hindi/Devanagari) — separate from the
+                // translation voice so users can pick the best Hindi voice
+                // for Pāli pronunciation.
+                _RealVoiceTile(
+                  icon: Icons.record_voice_over,
+                  title: loc.ttsPaliVoice,
+                  selectedVoice: settings.ttsPaliVoice,
+                  langCode: 'hi',
+                  allVoices: _cachedVoices ?? const [],
+                  loading: _voicesLoading,
+                  colors: colors,
+                  showNoVoiceHint: true,
+                  onVoiceChanged: (name) {
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setTtsPaliVoice(name);
+                  },
                 ),
               ],
             ),
             const SizedBox(height: AppDimensions.md),
           ],
 
-          // ── Speed ────────────────────────────────────────────────────
+          // ── Translation speed + voice ────────────────────────────────
           SettingsSection(
-            title: loc.ttsSpeed,
+            title: loc.ttsTranslationSpeed,
             colors: colors,
             children: [
               _SpeedSlider(
                 value: settings.ttsSpeed,
                 min: 0.5,
-                max: 4.0,
-                divisions: 14,
+                max: 8.0,
+                divisions: 71,
                 label: '${settings.ttsSpeed.toStringAsFixed(1)}×',
                 colors: colors,
                 onChanged: (v) {
                   ref.read(settingsProvider.notifier).setTtsSpeed(v);
                 },
               ),
-              const Divider(
-                height: 1,
-                indent: AppDimensions.md,
-                endIndent: AppDimensions.md,
-              ),
-              // Pāli is read separately (Devanagari/Hindi), so it gets its
-              // own speed — often a slower rate reads Pāli more clearly.
-              _SpeedSlider(
-                value: settings.ttsPaliSpeed,
-                min: 0.1,
-                max: 4.0,
-                // 39 divisions → clean 0.1 steps across the 0.1–4.0 range.
-                divisions: 39,
-                label: '${settings.ttsPaliSpeed.toStringAsFixed(1)}×',
-                colors: colors,
-                caption: loc.ttsPaliSpeed,
-                onChanged: (v) {
-                  ref.read(settingsProvider.notifier).setTtsPaliSpeed(v);
-                },
-              ),
+              if (!isSupertonic) ...[
+                const Divider(
+                  height: 1,
+                  indent: AppDimensions.md,
+                  endIndent: AppDimensions.md,
+                ),
+                _RealVoiceTile(
+                  icon: Icons.record_voice_over,
+                  title: loc.ttsTranslationVoice,
+                  selectedVoice: settings.ttsVoice,
+                  langCode: settings.visibleTranslationLangs.isNotEmpty
+                      ? settings.visibleTranslationLangs.first
+                      : 'en',
+                  allVoices: _cachedVoices ?? const [],
+                  loading: _voicesLoading,
+                  colors: colors,
+                  onVoiceChanged: (name) {
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setTtsVoice(name);
+                  },
+                ),
+              ],
             ],
           ),
           const SizedBox(height: AppDimensions.md),
@@ -944,12 +983,14 @@ class _SpeedSlider extends StatelessWidget {
   }
 
   String _minLabel(BuildContext context) {
-    if (min == 0.5 && max == 4.0) return '0.5×';
+    if (min == 0.5 && max == 8.0) return '0.5×';
     return AppLocalizations.of(context).low;
   }
 
   String _maxLabel(BuildContext context) {
-    if (min == 0.5 && max == 4.0) return '4.0×';
+    if (min == 0.5 && max == 8.0) return '8.0×';
+    if (min == 0.1 && max == 8.0) return '8.0×';
+    if (min == 0.1 && max == 3.0) return '3.0×';
     return AppLocalizations.of(context).high;
   }
 }
@@ -1026,20 +1067,7 @@ class _DropdownTile extends StatelessWidget {
 
 // ── Voice options ────────────────────────────────────────────────────────
 
-const _voiceOptions = [
-  ('default', 'System Default'),
-  ('female-1', 'Female Voice 1'),
-  ('female-2', 'Female Voice 2'),
-  ('male-1', 'Male Voice 1'),
-  ('male-2', 'Male Voice 2'),
-];
 
-String _voiceLabel(String voice) {
-  return _voiceOptions.firstWhere(
-    (o) => o.$1 == voice,
-    orElse: () => ('default', 'System Default'),
-  ).$2;
-}
 
 /// Display label for a Supertonic quality preset ('low' | 'medium' | 'high').
 String _qualityLabel(String quality) {
@@ -1050,6 +1078,161 @@ String _qualityLabel(String quality) {
       return 'High';
     default:
       return 'Medium';
+  }
+}
+
+// ── Real Voice Picker ────────────────────────────────────────────────────
+
+/// A voice picker tile that shows real system TTS voices filtered by
+/// language. Uses the same voice list as the reader's TTS controls dialog.
+class _RealVoiceTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String selectedVoice;
+  final String langCode;
+  final List<Map<String, String>> allVoices;
+  final bool loading;
+  final ColorScheme colors;
+  final ValueChanged<String> onVoiceChanged;
+
+  /// When true and no voices match [langCode], shows a warning hint
+  /// instead of a near-empty popup.
+  final bool showNoVoiceHint;
+
+  const _RealVoiceTile({
+    required this.icon,
+    required this.title,
+    required this.selectedVoice,
+    required this.langCode,
+    required this.allVoices,
+    required this.loading,
+    required this.colors,
+    required this.onVoiceChanged,
+    this.showNoVoiceHint = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    // Filter voices to the target language.
+    final lc = langCode.toLowerCase();
+    final filtered = allVoices.where((v) {
+      final vLoc = (v['locale'] ?? '').toLowerCase();
+      return vLoc == lc || vLoc.startsWith('$lc-') || vLoc.startsWith('${lc}_');
+    }).toList();
+    // Always include the selected voice even if it doesn't match the
+    // language filter (e.g. after switching languages).
+    if (selectedVoice.isNotEmpty &&
+        selectedVoice != 'default' &&
+        !filtered.any((v) => v['name'] == selectedVoice)) {
+      final sel = allVoices.where((v) => v['name'] == selectedVoice).toList();
+      if (sel.isNotEmpty) filtered.insert(0, sel.first);
+    }
+
+    final displayName = _voiceDisplayName(selectedVoice, filtered, loc);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppDimensions.md,
+        vertical: AppDimensions.md,
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: colors.primary),
+          const SizedBox(width: AppDimensions.md),
+          Expanded(
+            child: Text(
+              title,
+              style: AppTypography.labelMedium.copyWith(
+                color: colors.onSurface,
+              ),
+            ),
+          ),
+          if (loading)
+            SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: colors.onSurfaceVariant,
+              ),
+            )
+          else if (filtered.isEmpty && showNoVoiceHint && selectedVoice == 'default')
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: colors.errorContainer,
+                borderRadius: BorderRadius.circular(9999),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.warning_amber, size: 12, color: colors.error),
+                  const SizedBox(width: 4),
+                  Text(
+                    loc.ttsHindiVoiceNotInstalled,
+                    style: AppTypography.labelSmall.copyWith(
+                      color: colors.error,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            PopupMenuButton<String>(
+              initialValue: selectedVoice,
+              onSelected: onVoiceChanged,
+              itemBuilder: (context) => [
+                PopupMenuItem<String>(
+                  value: 'default',
+                  child: Text(loc.systemDefault),
+                ),
+                for (final v in filtered)
+                  PopupMenuItem<String>(
+                    value: v['name'] ?? 'default',
+                    child: Text(
+                      v['name'] ?? loc.unknown,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+              ],
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    displayName,
+                    style: AppTypography.labelSmall.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                  Icon(
+                    Icons.chevron_right,
+                    color: colors.onSurfaceVariant,
+                    size: 18,
+                  ),
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  String _voiceDisplayName(
+    String selected,
+    List<Map<String, String>> filtered,
+    AppLocalizations loc,
+  ) {
+    if (selected.isEmpty || selected == 'default') {
+      return loc.systemDefault;
+    }
+    final match = filtered.firstWhere(
+      (v) => v['name'] == selected,
+      orElse: () => const {},
+    );
+    return match['name'] ?? loc.systemDefault;
   }
 }
 

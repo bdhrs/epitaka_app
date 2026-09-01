@@ -516,6 +516,14 @@ class AppLocalizations {
   String get ttsVoiceMissingHint => _t(
     'This voice is not installed on your device. Tap "Install voice" to add it.',
   );
+  String get ttsPaliVoice => _t('Pāli voice');
+  String get ttsTranslationVoice => _t('Translation voice');
+  String get ttsHindiVoiceNotInstalled => _t('Hindi voice not installed');
+  String get ttsHindiVoiceMissingDesc => _t(
+    'A Hindi (Devanagari) voice is needed to read Pāli aloud. '
+    'Install one in your device Text-to-Speech settings.',
+  );
+  String get ttsInstallHindiVoice => _t('Install Hindi voice');
   String get ttsPreview => _t('Preview');
   String get translationNote => _t('Translation note');
   String get translationRemark => _t('Translation remark');
@@ -958,20 +966,20 @@ class AppLocalizations {
 
   String get semanticSearch => _t('Semantic search');
   String get investigationExploration => _t('Investigation & exploration');
-  String get tipitaka => _t('Tipitaka');
+  String get tipitaka => _t('Tipiṭaka');
   String get feedback => _t('Feedback');
   String get navigationMenu => _t('Navigation menu');
   String get chatHistory => _t('Chat history');
   String get newChat => _t('New chat');
   String get clearChat => _t('Clear chat');
-  String get vimamsaSettings => _t('Vimaṃsa Settings');
+  String get vimamsaSettings => _t('Vīmaṃsā Settings');
   String get buildingHeadingIndex => _t('Building heading index…');
   String get headingIndexNeeded =>
       _t('Heading index needed for @ — build now?');
   String get askAboutTipitakaShort => _t('Ask about the Tipitaka');
   String get vimamsaIntro => _t(
-    'Vimaṃsa — investigation through questioning.\n'
-    'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
+    'Vīmaṃsā — investigation through questioning.\n'
+    'The AI searches the Tipiṭaka using tools, gathers relevant passages,\n'
     'and provides detailed answers with clickable citations.\n'
     'Each chat thread is saved — you can continue later.',
   );
@@ -992,6 +1000,14 @@ class AppLocalizations {
   String get activeLabel => _t('Active');
   String get andAllItsMessages => _t('and all its messages?');
   String get queryWord => _t('query');
+  String get pinThread => _t('Pin thread');
+  String get unpinThread => _t('Unpin thread');
+  String get searchInThread => _t('Search in thread…');
+  String get searchHistory => _t('Search history…');
+  String get noResultsFound => _t('No results found');
+  String get reset => _t('Reset');
+  String get newChatShortcut => _t('New Chat');
+  String get stopGenerating => _t('Stop generating');
   String get queriesWord => _t('queries');
   String get remainingInThread => _t('remaining in this thread');
   String get translationWord => _t('Translation');
@@ -1020,10 +1036,10 @@ class AppLocalizations {
   String get libraryLabel => _t('Library');
   String get resetLayout => _t('Reset layout');
   String get paliTipitakaReader => _t('Pāli Tipiṭaka Reader');
-  String get vimamsa => _t('Vimaṃsa');
+  String get vimamsa => _t('Vīmaṃsā');
   String get openGavesana => _t('Open Gavesana');
-  String get gavesana => _t('Gavesana');
-  String get gavesanaAiSearch => _t('Gavesana AI Search');
+  String get gavesana => _t('Gavesanā');
+  String get gavesanaAiSearch => _t('Gavesanā AI Search');
   String get gavesanaPanelDesc => _t(
     'AI-powered search across the Tipiṭaka.\n\n'
     'Open the full Gavesana panel for detailed results.',

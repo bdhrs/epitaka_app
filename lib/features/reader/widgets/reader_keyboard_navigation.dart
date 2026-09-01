@@ -67,7 +67,9 @@ class _ReaderKeyboardNavigationState
       _modeBeforeNav = settings.translationDisplayMode;
       ref
           .read(settingsProvider.notifier)
-          .setTranslationDisplayModeTemporary(TranslationDisplayMode.lineByLine);
+          .setTranslationDisplayModeTemporary(
+            TranslationDisplayMode.lineByLine,
+          );
     }
   }
 
@@ -109,8 +111,8 @@ class _ReaderKeyboardNavigationState
       return KeyEventResult.ignored;
     }
     // Never steal keys while the user is typing somewhere (search fields,
-    // the Vimaṃsa chat input, …) — those live outside this subtree on
-    // desktop, but Vimaṃsa is inside the center column, so guard by focus.
+    // the Vīmaṃsā chat input, …) — those live outside this subtree on
+    // desktop, but Vīmaṃsā is inside the center column, so guard by focus.
     if (_textFieldHasFocus) return KeyEventResult.ignored;
     if (ref.read(vimamsaOpenProvider)) return KeyEventResult.ignored;
     if (_activeBookId == null) return KeyEventResult.ignored;
@@ -118,18 +120,15 @@ class _ReaderKeyboardNavigationState
     if (data == null || data.paragraphs.isEmpty) return KeyEventResult.ignored;
 
     final key = event.logicalKey;
-    if (key == LogicalKeyboardKey.keyJ ||
-        key == LogicalKeyboardKey.arrowDown) {
+    if (key == LogicalKeyboardKey.keyJ || key == LogicalKeyboardKey.arrowDown) {
       _moveLine(1);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyK ||
-        key == LogicalKeyboardKey.arrowUp) {
+    if (key == LogicalKeyboardKey.keyK || key == LogicalKeyboardKey.arrowUp) {
       _moveLine(-1);
       return KeyEventResult.handled;
     }
-    if (key == LogicalKeyboardKey.keyH ||
-        key == LogicalKeyboardKey.arrowLeft) {
+    if (key == LogicalKeyboardKey.keyH || key == LogicalKeyboardKey.arrowLeft) {
       _moveChip(-1);
       return KeyEventResult.handled;
     }
@@ -277,9 +276,8 @@ class _ReaderKeyboardNavigationState
       final paraLinks = data.bookLinks[para.paraId];
       final lineRange = List<int>.generate(para.lines.length, (i) => i);
       final ordered = direction > 0 ? lineRange : lineRange.reversed.toList();
-      final start = nav.engaged &&
-              nav.paraId == para.paraId &&
-              nav.lineId != null
+      final start =
+          nav.engaged && nav.paraId == para.paraId && nav.lineId != null
           ? nav.lineId!
           : (direction > 0 ? -1 : para.lines.length);
       for (final lineIndex in ordered) {

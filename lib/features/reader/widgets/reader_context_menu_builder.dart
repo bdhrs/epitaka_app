@@ -102,7 +102,7 @@ class ReaderContextMenuBuilder {
       },
       // Custom AI prompts run against the selected text (see the Context
       // Menu settings screen). {selectedText} is already substituted in
-      // by ReaderCopyService — just stage the prompt and open Vimaṃsa AI.
+      // by ReaderCopyService — just stage the prompt and open Vīmaṃsā AI.
       onAiPrompt: (prompt) =>
           ReaderAiService.stageCustomPrompt(context, ref, prompt),
     );

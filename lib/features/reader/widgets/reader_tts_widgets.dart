@@ -107,6 +107,7 @@ class TtsControlsCard extends StatelessWidget {
   final ValueChanged<double> onPaliSpeedChanged;
   final ValueChanged<double> onPitchChanged;
   final ValueChanged<String> onVoiceChanged;
+  final ValueChanged<String> onPaliVoiceChanged;
   final ValueChanged<TtsSpeakMode> onSpeakModeChanged;
   final VoidCallback onInstallVoiceTap;
   final VoidCallback onSystemConfigTap;
@@ -123,6 +124,7 @@ class TtsControlsCard extends StatelessWidget {
     required this.onPaliSpeedChanged,
     required this.onPitchChanged,
     required this.onVoiceChanged,
+    required this.onPaliVoiceChanged,
     required this.onSpeakModeChanged,
     required this.onInstallVoiceTap,
     required this.onSystemConfigTap,
@@ -198,18 +200,36 @@ class TtsControlsCard extends StatelessWidget {
             label: loc.ttsPaliSpeed,
             value: settings.ttsPaliSpeed,
             min: 0.1,
-            max: 4.0,
+            max: 3.0,
             displayValue: '${settings.ttsPaliSpeed.toStringAsFixed(1)}×',
             colors: colors,
             onChanged: onPaliSpeedChanged,
           ),
+          // Pāli voice picker (Hindi voices).
+          if (settings.ttsEngine == 'system') ...[
+            const SizedBox(height: 4),
+            _CompactVoicePicker(
+              label: loc.ttsPaliVoice,
+              selectedVoice: settings.ttsPaliVoice,
+              voices: filterVoicesForLanguage(
+                voices,
+                'hi',
+                selectedVoice: settings.ttsPaliVoice,
+                showAllIfEmpty: false,
+              ),
+              colors: colors,
+              onChanged: onPaliVoiceChanged,
+              showInstallHint: true,
+            ),
+          ],
           const SizedBox(height: AppDimensions.sm),
+          // Translation speed + voice.
           _ControlSlider(
             icon: Icons.speed,
             label: loc.ttsTranslationSpeed,
             value: settings.ttsSpeed,
             min: 0.5,
-            max: 4.0,
+            max: 8.0,
             displayValue: '${settings.ttsSpeed.toStringAsFixed(1)}×',
             colors: colors,
             onChanged: onSpeedChanged,
@@ -284,68 +304,25 @@ class TtsControlsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppDimensions.md),
+          // Translation voice picker.
+          if (settings.ttsEngine == 'system') ...[
+            _CompactVoicePicker(
+              label: loc.ttsTranslationVoice,
+              selectedVoice: settings.ttsVoice,
+              voices: filterVoicesForLanguage(
+                voices,
+                settings.visibleTranslationLangs.isNotEmpty
+                    ? settings.visibleTranslationLangs.first
+                    : 'en',
+                selectedVoice: settings.ttsVoice,
+              ),
+              colors: colors,
+              onChanged: onVoiceChanged,
+            ),
+            const SizedBox(height: AppDimensions.sm),
+          ],
           Row(
             children: [
-              if (settings.ttsEngine == 'system') ...[
-                Expanded(
-                  child: PopupMenuButton<String>(
-                    initialValue: settings.ttsVoice,
-                    onSelected: onVoiceChanged,
-                    itemBuilder: (context) => voices.isEmpty
-                        ? [
-                            PopupMenuItem<String>(
-                              value: 'default',
-                              child: Text(loc.systemDefault),
-                            ),
-                          ]
-                        : voices
-                              .map(
-                                (v) => PopupMenuItem<String>(
-                                  value: v['name'] ?? 'default',
-                                  child: Text(v['name'] ?? loc.unknown),
-                                ),
-                              )
-                              .toList(),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: colors.outlineVariant),
-                        borderRadius: BorderRadius.circular(9999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            Icons.record_voice_over,
-                            size: 14,
-                            color: colors.primary,
-                          ),
-                          const SizedBox(width: 4),
-                          Flexible(
-                            child: Text(
-                              loc.ttsVoiceLabel,
-                              overflow: TextOverflow.ellipsis,
-                              style: AppTypography.labelSmall.copyWith(
-                                color: colors.onSurfaceVariant,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.chevron_right,
-                            size: 14,
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-              ],
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: onSystemConfigTap,
@@ -441,6 +418,116 @@ class _ControlSlider extends StatelessWidget {
   }
 }
 
+// ── Compact Voice Picker ────────────────────────────────────────────────
+
+/// A compact voice picker for the TTS controls dialog. Shows a label
+/// and a popup menu of filtered voices.
+class _CompactVoicePicker extends StatelessWidget {
+  final String label;
+  final String selectedVoice;
+  final List<Map<String, String>> voices;
+  final ColorScheme colors;
+  final ValueChanged<String> onChanged;
+  final bool showInstallHint;
+
+  const _CompactVoicePicker({
+    required this.label,
+    required this.selectedVoice,
+    required this.voices,
+    required this.colors,
+    required this.onChanged,
+    this.showInstallHint = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final displayName = selectedVoice.isEmpty || selectedVoice == 'default'
+        ? loc.systemDefault
+        : (voices.firstWhere(
+            (v) => v['name'] == selectedVoice,
+            orElse: () => const {},
+          )['name'] ?? loc.systemDefault);
+
+    // Show install hint when no voices match this language.
+    if (voices.isEmpty && showInstallHint) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          border: Border.all(color: colors.errorContainer),
+          borderRadius: BorderRadius.circular(9999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.warning_amber, size: 14, color: colors.error),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                loc.ttsHindiVoiceNotInstalled,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.labelSmall.copyWith(
+                  color: colors.error,
+                  fontSize: 10,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return PopupMenuButton<String>(
+      initialValue: selectedVoice,
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        PopupMenuItem<String>(
+          value: 'default',
+          child: Text(loc.systemDefault),
+        ),
+        for (final v in voices)
+          PopupMenuItem<String>(
+            value: v['name'] ?? 'default',
+            child: Text(
+              v['name'] ?? loc.unknown,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+      ],
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          border: Border.all(color: colors.outlineVariant),
+          borderRadius: BorderRadius.circular(9999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.record_voice_over, size: 14, color: colors.primary),
+            const SizedBox(width: 4),
+            Flexible(
+              child: Text(
+                '$label: $displayName',
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.labelSmall.copyWith(
+                  color: colors.onSurfaceVariant,
+                  fontSize: 11,
+                ),
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.chevron_right,
+              size: 14,
+              color: colors.onSurfaceVariant,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 String stripHtmlForTts(String text) {
   return text
       .replaceAll(RegExp(r'<i>.*?</i>', caseSensitive: false, dotAll: true), '')
@@ -451,8 +538,10 @@ String stripHtmlForTts(String text) {
 }
 
 /// Keep only system voices whose locale matches [langCode] (e.g. 'en'
-/// → 'en-US', 'en-GB'). Falls back to all voices when none match so the
-/// picker is never empty, and always keeps the currently selected voice
+/// → 'en-US', 'en-GB'). When [showAllIfEmpty] is true (the default),
+/// falls back to all voices when none match so the picker is never
+/// empty. When false, returns an empty list so the caller can show
+/// an install-hint instead. Always keeps the currently selected voice
 /// selectable so the menu's initial value stays valid.
 ///
 /// Voices come from flutter_tts `getVoices()` with `name` + `locale` keys.
@@ -460,6 +549,7 @@ List<Map<String, String>> filterVoicesForLanguage(
   List<Map<String, String>> voices,
   String langCode, {
   required String selectedVoice,
+  bool showAllIfEmpty = true,
 }) {
   if (voices.isEmpty) return voices;
   final lc = langCode.toLowerCase();
@@ -467,7 +557,7 @@ List<Map<String, String>> filterVoicesForLanguage(
     final loc = (v['locale'] ?? '').toLowerCase();
     return loc == lc || loc.startsWith('$lc-') || loc.startsWith('${lc}_');
   }).toList();
-  if (matched.isEmpty) return voices;
+  if (matched.isEmpty) return showAllIfEmpty ? voices : <Map<String, String>>[];
   if (selectedVoice.isNotEmpty &&
       selectedVoice != 'default' &&
       !matched.any((v) => v['name'] == selectedVoice)) {

@@ -1,4 +1,4 @@
-// Tests for the shared AI tool search used by Gavesana and Vimaṃsa.
+// Tests for the shared AI tool search used by Gavesana and Vīmaṃsā.
 //
 // Coverage:
 //   * `search_tipitaka` finds passages via the ENGLISH TRANSLATION when the

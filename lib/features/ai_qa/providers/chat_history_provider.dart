@@ -1,4 +1,4 @@
-/// Riverpod provider for managing chat thread history in Vimaṃsa.
+/// Riverpod provider for managing chat thread history in Vīmaṃsā.
 ///
 /// Provides CRUD operations for [ChatThread] records, backed by the
 /// local [AppDatabase] (which lazily creates `chat_threads` and
@@ -132,6 +132,14 @@ class ChatHistoryNotifier {
   Future<void> updateThreadTitle(String id, String title) async {
     final db = await _ref.read(appDbProvider.future);
     await db.updateChatThreadTitle(id, title);
+    _ref.invalidate(chatThreadsProvider);
+    _ref.invalidate(chatThreadProvider(id));
+  }
+
+  /// Toggle pinned state of a thread.
+  Future<void> toggleThreadPinned(String id) async {
+    final db = await _ref.read(appDbProvider.future);
+    await db.toggleChatThreadPinned(id);
     _ref.invalidate(chatThreadsProvider);
     _ref.invalidate(chatThreadProvider(id));
   }

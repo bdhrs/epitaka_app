@@ -8,21 +8,17 @@ import '../../shared/utils/app_shortcuts.dart';
 ///
 /// Each top button toggles a sidebar panel (one at a time — clicking an
 /// item opens the sidebar showing it and closes the others). The dictionary
-/// button toggles the dictionary dock, Vimaṃsa opens the center chat tab,
+/// button toggles the dictionary dock, Vīmaṃsā opens the center chat tab,
 /// and the bottom section holds layout-wide actions (reset, settings).
 class DesktopActivityBar extends StatelessWidget {
   /// The sidebar panel currently open in the left slot (highlights its
   /// button), or null when the sidebar is closed.
   final SidePanelType? activeSidebar;
 
-  /// Whether the dictionary is currently visible (docked or on the right).
-  final bool dictionaryVisible;
-
-  /// Whether the Vimaṃsa center tab is selected.
+  /// Whether the Vīmaṃsā center tab is selected.
   final bool vimamsaActive;
 
   final ValueChanged<SidePanelType> onToggleSidebar;
-  final VoidCallback onToggleDictionary;
   final VoidCallback onToggleVimamsa;
   final VoidCallback onResetLayout;
   final VoidCallback onOpenSettings;
@@ -30,10 +26,8 @@ class DesktopActivityBar extends StatelessWidget {
   const DesktopActivityBar({
     super.key,
     required this.activeSidebar,
-    required this.dictionaryVisible,
     required this.vimamsaActive,
     required this.onToggleSidebar,
-    required this.onToggleDictionary,
     required this.onToggleVimamsa,
     required this.onResetLayout,
     required this.onOpenSettings,
@@ -48,11 +42,15 @@ class DesktopActivityBar extends StatelessWidget {
       // Each entry carries the id of its global shortcut (see
       // AppShortcuts.shortcutCatalog) so the tooltip can show the key
       // hint; entries without one get the plain label.
+      //
+      // Order matches the mobile drawer:
+      //   Tipiṭaka, Vīmaṃsā, Search, Gavesanā,
+      //   Annotations, Outline, Dictionary, Script Converter, Translation Builder
       _ActivityItem(
         SidePanelType.library,
         Icons.library_books_outlined,
         Icons.library_books,
-        loc.libraryLabel,
+        loc.tipitaka,
         shortcutId: 'library-sidebar',
       ),
       _ActivityItem(
@@ -61,13 +59,6 @@ class DesktopActivityBar extends StatelessWidget {
         Icons.search,
         loc.search,
         shortcutId: 'find-everywhere',
-      ),
-      _ActivityItem(
-        SidePanelType.history,
-        Icons.history,
-        Icons.history,
-        loc.history,
-        shortcutId: 'history',
       ),
       _ActivityItem(
         SidePanelType.annotations,
@@ -80,14 +71,8 @@ class DesktopActivityBar extends StatelessWidget {
         SidePanelType.contents,
         Icons.format_list_bulleted,
         Icons.format_list_bulleted,
-        loc.contents,
+        loc.outline,
         shortcutId: 'contents',
-      ),
-      _ActivityItem(
-        SidePanelType.scriptConverter,
-        Icons.swap_horiz,
-        Icons.swap_horiz,
-        loc.scriptConverter,
       ),
       _ActivityItem(
         SidePanelType.gavesana,
@@ -96,19 +81,30 @@ class DesktopActivityBar extends StatelessWidget {
         loc.gavesana,
       ),
       _ActivityItem(
-        SidePanelType.translator,
-        Icons.translate,
-        Icons.translate,
-        loc.t('Translation Builder'),
+        SidePanelType.history,
+        Icons.history,
+        Icons.history,
+        loc.history,
+        shortcutId: 'history',
       ),
       _ActivityItem(
-        null, // dictionary is not a plain sidebar toggle
+        SidePanelType.dictionary,
         Icons.menu_book_outlined,
         Icons.menu_book,
         loc.dictionary,
         shortcutId: 'dictionary',
-        activeOverride: dictionaryVisible,
-        onTapOverride: onToggleDictionary,
+      ),
+      _ActivityItem(
+        SidePanelType.scriptConverter,
+        Icons.swap_horiz,
+        Icons.swap_horiz,
+        loc.scriptConverter,
+      ),
+      _ActivityItem(
+        SidePanelType.translator,
+        Icons.translate,
+        Icons.translate,
+        loc.t('Translation Builder'),
       ),
     ];
 
@@ -134,14 +130,12 @@ class DesktopActivityBar extends StatelessWidget {
                           : AppShortcuts.tooltip(item.label, item.shortcutId!),
                       active: item.isActive(activeSidebar),
                       onTap: () {
-                        if (item.onTapOverride != null) {
-                          item.onTapOverride!();
-                        } else if (item.toggleSidebar != null) {
+                        if (item.toggleSidebar != null) {
                           onToggleSidebar(item.toggleSidebar!);
                         }
                       },
                     ),
-                  // Vimaṃsa center tab (separate group)
+                  // Vīmaṃsā center tab (separate group)
                   _ActivityBarButton(
                     icon: vimamsaActive
                         ? Icons.auto_awesome
@@ -185,22 +179,15 @@ class _ActivityItem {
   /// tooltip. Null when the action has no keyboard shortcut.
   final String? shortcutId;
 
-  /// For items that aren't plain sidebar toggles (e.g. dictionary).
-  final bool? activeOverride;
-  final VoidCallback? onTapOverride;
-
   const _ActivityItem(
     this.toggleSidebar,
     this.icon,
     this.activeIcon,
     this.label, {
     this.shortcutId,
-    this.activeOverride,
-    this.onTapOverride,
   });
 
   bool isActive(SidePanelType? activeSidebar) {
-    if (activeOverride != null) return activeOverride!;
     return activeSidebar == toggleSidebar;
   }
 }

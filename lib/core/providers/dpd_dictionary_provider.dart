@@ -173,8 +173,9 @@ final dpdSubLookupProvider = FutureProvider.autoDispose
       // Run synchronous DB calls after the current frame.
       return _runAfterFrame(() {
         final lookup = db.getLookup(normalized);
-        if (lookup == null || lookup.headwords.isEmpty)
+        if (lookup == null || lookup.headwords.isEmpty) {
           return <DpdHeadwordRow>[];
+        }
         return db.getHeadwordsByIds(lookup.headwords);
       });
     });

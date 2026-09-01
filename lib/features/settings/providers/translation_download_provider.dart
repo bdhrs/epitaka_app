@@ -17,6 +17,7 @@ import '../../../core/providers/database_provider.dart';
 import '../../../core/providers/translation_manifest_provider.dart';
 import '../../../core/providers/translation_registry_provider.dart';
 import '../../../core/providers/dpd_dictionary_provider.dart';
+import '../../../core/providers/settings_provider.dart';
 import '../../../core/utils/database_initializer.dart';
 
 /// Download state for a specific translation version.
@@ -427,6 +428,16 @@ class TranslationDownloadNotifier
         ref.invalidate(nissayaDbByFilenameProvider(version.filename));
       } else {
         ref.invalidate(translationDbProvider(version.languageCode));
+      }
+
+      // Auto-enable the newly downloaded translation so the user doesn't
+      // have to manually toggle it on after waiting for the download.
+      final settingsState = ref.read(settingsProvider);
+      if (!settingsState.enabledTranslations
+          .contains(version.languageCode)) {
+        await ref
+            .read(settingsProvider.notifier)
+            .setTranslationEnabled(version.languageCode, true);
       }
 
       await _fgsStop();

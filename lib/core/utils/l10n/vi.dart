@@ -616,10 +616,10 @@ const Map<String, String> vi = {
 
   'Semantic search': 'Tìm kiếm ngữ nghĩa',
   'Investigation & exploration': 'Điều tra & khám phá',
-  'Tipitaka': 'Tipitaka',
+  'Tipiṭaka': 'Tipitaka',
   'Feedback': 'Phản hồi',
   'Pāli Tipiṭaka Reader': 'Trình đọc Pāli Tipiṭaka',
-  'Vimaṃsa': 'Vimaṃsa',
+  'Vīmaṃsā': 'Vīmaṃsā',
 
   // ── Gavesana FTS Build Dialog ───────────────────────────────────────
 
@@ -749,26 +749,26 @@ const Map<String, String> vi = {
   'Reset layout': 'Đặt lại bố cục',
 
   // ── Gavesana ────────────────────────────────────────────────────────
-  'Gavesana': 'Gavesana',
+  'Gavesanā': 'Gavesana',
   'Gavesana AI Search': 'Tìm kiếm AI Gavesana',
   'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesana panel for detailed results.':
       'Tìm kiếm ngữ nghĩa bằng AI trên toàn bộ Tipiṭaka.\n\nMở bảng Gavesana đầy đủ để xem kết quả chi tiết.',
 
-  // ── AI Q&A (Vimaṃsa) ────────────────────────────────────────────────
+  // ── AI Q&A (Vīmaṃsā) ────────────────────────────────────────────────
   'Navigation menu': 'Menu điều hướng',
   'Chat history': 'Lịch sử trò chuyện',
   'New chat': 'Trò chuyện mới',
   'Clear chat': 'Xóa trò chuyện',
-  'Vimaṃsa Settings': 'Cài đặt Vimaṃsa',
+  'Vīmaṃsā Settings': 'Cài đặt Vīmaṃsā',
   'Building heading index…': 'Đang xây dựng chỉ mục tiêu đề…',
   'Heading index needed for @ — build now?':
       'Cần chỉ mục tiêu đề cho @ — xây dựng ngay?',
   'Ask about the Tipitaka': 'Hỏi về Tipitaka',
-  'Vimaṃsa — investigation through questioning.\n'
+  'Vīmaṃsā — investigation through questioning.\n'
           'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
           'and provides detailed answers with clickable citations.\n'
           'Each chat thread is saved — you can continue later.':
-      'Vimaṃsa — khảo sát thông qua đặt câu hỏi.\n'
+      'Vīmaṃsā — khảo sát thông qua đặt câu hỏi.\n'
       'AI tìm kiếm Tipitaka bằng công cụ, thu thập các đoạn kinh liên quan,\n'
       'và đưa ra câu trả lời chi tiết kèm trích dẫn có thể nhấp.\n'
       'Mỗi cuộc trò chuyện đều được lưu lại — bạn có thể tiếp tục sau.',
@@ -875,8 +875,8 @@ const Map<String, String> vi = {
   'Copy Link — copy a shareable link to this exact passage.':
       'Sao chép liên kết — sao chép liên kết chia sẻ đến đúng đoạn này.',
   'Dictionary — look up the selected word.': 'Từ điển — tra từ đã chọn.',
-  'Explain — ask Vimaṃsa AI to explain the selection.':
-      'Giải thích — nhờ AI Vimaṃsa giải thích vùng chọn.',
+  'Explain — ask Vīmaṃsā AI to explain the selection.':
+      'Giải thích — nhờ AI Vīmaṃsā giải thích vùng chọn.',
   'Summarize Ch. — summarize the current chapter with AI.':
       'Tóm tắt chương — tóm tắt chương hiện tại bằng AI.',
   'Share — share the selection via the system share sheet.':
@@ -899,15 +899,15 @@ const Map<String, String> vi = {
       'Văn bản thành giọng nói — giọng đọc, tốc độ, cao độ và thay thế từ.',
   'Dictionaries — enable, disable and reorder dictionaries.':
       'Từ điển — bật, tắt và sắp xếp từ điển.',
-  'AI Q&A — enter your API key and pick models for Vimaṃsa.':
-      'AI Q&A — nhập khóa API và chọn mô hình cho Vimaṃsa.',
+  'AI Q&A — enter your API key and pick models for Vīmaṃsā.':
+      'AI Q&A — nhập khóa API và chọn mô hình cho Vīmaṃsā.',
 
-  // ── Feature Guide: AI (Vimaṃsa) ───────────────────────────────────
-  'AI — Vimaṃsa': 'AI — Vimaṃsa',
+  // ── Feature Guide: AI (Vīmaṃsā) ───────────────────────────────────
+  'AI — Vīmaṃsā': 'AI — Vīmaṃsā',
   'Ask the AI about the Tipiṭaka. It searches the Canon and answers with citations.':
       'Hỏi AI về Tipiṭaka. AI tìm kiếm trong Kinh điển và trả lời kèm trích dẫn.',
-  'Ask a question — open Vimaṃsa from the menu and ask anything.':
-      'Đặt câu hỏi — mở Vimaṃsa từ menu và hỏi bất cứ điều gì.',
+  'Ask a question — open Vīmaṃsā from the menu and ask anything.':
+      'Đặt câu hỏi — mở Vīmaṃsā từ menu và hỏi bất cứ điều gì.',
   'Explain — select text in the reader and tap Explain for a commentary-grounded explanation.':
       'Giải thích — chọn văn bản trong trình đọc và chạm Giải thích để có lời giải thích dựa trên chú giải.',
   'Summarize — tap Summarize Ch. to get an overview of the current chapter.':

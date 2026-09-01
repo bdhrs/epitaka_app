@@ -17,7 +17,6 @@ import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/utils/native_lookup_service.dart';
-import '../../../core/utils/pali_text_utils.dart';
 import '../../../core/utils/velthuis.dart';
 import '../providers/dictionary_sheet_open_provider.dart'
     show dictionarySheetOpenProvider;
@@ -233,7 +232,11 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
 
     final converted = velthuis(value);
 
-    if (converted != value && converted.trim().isNotEmpty) {
+    // Only update the display for Roman-script input; non-Roman
+    // scripts (Sinhala, Thai, Myanmar, …) pass through unchanged.
+    if (isRomanScript(value) &&
+        converted != value &&
+        converted.trim().isNotEmpty) {
       _isConverting = true;
       _searchController.value = convertedTextEditingValue(
         _searchController.value,
@@ -429,230 +432,251 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
     final trans = settings.typography.typographyFor(
       settings.primaryTranslationLang,
     );
-    final bottomPadding = MediaQuery.of(context).padding.bottom;
+    // Use paddingOf() instead of MediaQuery.of(context) to avoid
+    // rebuilding on every keyboard animation frame. MediaQuery.of(context)
+    // subscribes to the entire MediaQuery including viewInsets, which
+    // changes ~60 times during the ~300ms keyboard open animation,
+    // causing the expensive dictionary results to rebuild per frame.
+    final bottomPadding = MediaQuery.paddingOf(context).bottom;
     final transSize = (trans.fontSize * 0.8).clamp(12.0, 24.0);
 
-    return Listener(
-      // Track fingers on the whole sheet so the flick velocity can be
-      // estimated from extent samples on release (DraggableScrollableSheet
-      // gives no velocity on drag end).
-      onPointerDown: _onSheetPointerDown,
-      onPointerUp: _onSheetPointerUp,
-      onPointerCancel: _onSheetPointerCancel,
-      child: NotificationListener<DraggableScrollableNotification>(
-        // Dismiss when the user drags the sheet below the close extent, or
-        // flicks it down fast from any height. Guarded by [_dismissed] so
-        // the pop only happens once per gesture, preventing the reader
-        // route underneath from also being closed.
-        onNotification: (notification) {
-          if (!_dismissed) {
-            // Feed the fling estimator; the actual flick decision happens on
-            // pointer-up so a quick deliberate drag can't close mid-gesture.
-            _recordSwipeSample(notification.extent);
-            if (notification.extent <= _sheetCloseExtent) {
-              _dismissed = true;
-              Navigator.of(context).pop();
+    // Strip the keyboard view insets so the Scaffold created by
+    // showModalBottomSheet does not resize when the keyboard opens.
+    // Without this, the DraggableScrollableSheet and its scrollbar/bottom
+    // bar shift upward on every keyboard animation frame (~300ms).
+    return MediaQuery.removeViewInsets(
+      context: context,
+      removeBottom: true,
+      child: Listener(
+        // Track fingers on the whole sheet so the flick velocity can be
+        // estimated from extent samples on release (DraggableScrollableSheet
+        // gives no velocity on drag end).
+        onPointerDown: _onSheetPointerDown,
+        onPointerUp: _onSheetPointerUp,
+        onPointerCancel: _onSheetPointerCancel,
+        child: NotificationListener<DraggableScrollableNotification>(
+          // Dismiss when the user drags the sheet below the close extent, or
+          // flicks it down fast from any height. Guarded by [_dismissed] so
+          // the pop only happens once per gesture, preventing the reader
+          // route underneath from also being closed.
+          onNotification: (notification) {
+            if (!_dismissed) {
+              // Feed the fling estimator; the actual flick decision happens on
+              // pointer-up so a quick deliberate drag can't close mid-gesture.
+              _recordSwipeSample(notification.extent);
+              if (notification.extent <= _sheetCloseExtent) {
+                _dismissed = true;
+                Navigator.of(context).pop();
+              }
             }
-          }
-          return false;
-        },
-        child: DraggableScrollableSheet(
-          controller: _sheetController,
-          // Don't expand to fill the whole screen: with `expand: true` (the
-          // default) the sheet's internal scrollable covers the full screen
-          // and swallows taps in the space above the sheet, so tapping
-          // outside no longer dismisses the modal (the barrier never sees
-          // the tap). With `expand: false` the scrollable only covers the
-          // sheet itself and the top space returns to the modal barrier.
-          expand: false,
-          initialChildSize: _sheetInitialSize,
-          minChildSize: _sheetMinSize,
-          maxChildSize: _sheetMaxSize,
-          // No snap: the sheet tracks the finger so a downward drag can always
-          // reach [_sheetCloseExtent] and close the sheet from any height.
-          snap: false,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: colors.surface,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(AppDimensions.radiusSheet),
-                ),
-              ),
-              child: Column(
-                children: [
-                  // The handle, search bar, and history row are wrapped in a
-                  // GestureDetector so dragging on them also resizes/closes the
-                  // sheet, same as dragging on the content area below.
-                  GestureDetector(
-                    behavior: HitTestBehavior.translucent,
-                    onVerticalDragUpdate: (details) {
-                      // The dismiss pop below can dispose the sheet while the
-                      // drag gesture is still delivering events (the route's
-                      // exit animation keeps the pointer stream alive), which
-                      // detaches the controller mid-gesture. Guard so those
-                      // trailing events no-op instead of asserting.
-                      if (!_sheetController.isAttached) return;
-                      final screenHeight = MediaQuery.of(context).size.height;
-                      final delta = details.primaryDelta! / screenHeight;
-                      final newSize = (_sheetController.size - delta).clamp(
-                        _sheetMinSize,
-                        _sheetMaxSize,
-                      );
-                      _sheetController.jumpTo(newSize);
-                    },
-                    onVerticalDragEnd: (details) {
-                      if (_dismissed || !_sheetController.isAttached) return;
-                      final flick = details.primaryVelocity ?? 0;
-                      if (flick > _kHeaderFlingVelocityPxPerSec ||
-                          _sheetController.size <= _sheetCloseExtent) {
-                        _dismissed = true;
-                        Navigator.of(context).pop();
-                      }
-                    },
-                    child: Column(
-                      children: [
-                        // Drag handle — a visual affordance for the pull-to-close /
-                        // drag-to-expand gesture. The whole sheet is already draggable
-                        // (handled by DraggableScrollableSheet), so this is purely
-                        // decorative.
-                        Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 8),
-                          child: Center(
-                            child: Container(
-                              width: 36,
-                              height: 4,
-                              decoration: BoxDecoration(
-                                color: colors.outlineVariant,
-                                borderRadius: BorderRadius.circular(2),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Search bar row
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(
-                            4,
-                            AppDimensions.sm,
-                            AppDimensions.marginMobile - 8,
-                            0,
-                          ),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: _searchController,
-                                  focusNode: _focusNode,
-                                  autofocus: _shouldAutofocus,
-                                  textInputAction: TextInputAction.search,
-                                  decoration: InputDecoration(
-                                    hintText: AppLocalizations.of(
-                                      context,
-                                    ).searchPali,
-                                    prefixIcon: Icon(
-                                      Icons.search,
-                                      color: colors.onSurfaceVariant,
-                                    ),
-                                    suffixIcon:
-                                        _searchController.text.isNotEmpty
-                                        ? IconButton(
-                                            icon: const Icon(Icons.clear),
-                                            onPressed: () {
-                                              _searchController.clear();
-                                              _onSearchChanged('');
-                                              _focusNode.requestFocus();
-                                            },
-                                          )
-                                        : null,
-                                    filled: true,
-                                    fillColor: colors.surfaceContainerHighest,
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(
-                                        AppDimensions.radiusXl,
-                                      ),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: AppDimensions.md,
-                                      vertical: 12,
-                                    ),
-                                  ),
-                                  style: AppTypography.bodyTranslation.copyWith(
-                                    color: colors.onSurface,
-                                    fontSize: transSize,
-                                    fontFamily: trans.fontFamily.fontFamily,
-                                  ),
-                                  onChanged: _onSearchChanged,
-                                  onSubmitted: _performSearch,
-                                ),
-                              ),
-                              // Pin to right side panel (desktop only). When pinned,
-                              // the lookup moves to the docked panel and this sheet
-                              // closes.
-                              if (ResponsiveBreakpoint.isDesktop(context)) ...[
-                                const SizedBox(width: 4),
-                                _SheetPinButton(
-                                  word: _query,
-                                  onPinned: () => Navigator.of(context).pop(),
-                                ),
-                              ],
-                            ],
-                          ),
-                        ),
-                        // Search history row
-                        if (_searchHistory.isNotEmpty)
-                          Container(
-                            height: 40,
-                            margin: const EdgeInsets.only(
-                              top: 8,
-                              left: 16,
-                              right: 16,
-                            ),
-                            child: ListView.separated(
-                              scrollDirection: Axis.horizontal,
-                              itemCount: _searchHistory.length,
-                              separatorBuilder: (context, index) =>
-                                  const SizedBox(width: 8),
-                              itemBuilder: (context, index) {
-                                return ActionChip(
-                                  label: Text(_searchHistory[index]),
-                                  labelStyle: AppTypography.labelSmall.copyWith(
-                                    color: colors.onSurfaceVariant,
-                                  ),
-                                  backgroundColor:
-                                      colors.surfaceContainerHighest,
-                                  side: BorderSide.none,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(16),
-                                  ),
-                                  onPressed: () {
-                                    _searchController.text =
-                                        _searchHistory[index];
-                                    _performSearch(_searchHistory[index]);
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                      ],
-                    ),
-                  ),
-
-                  const SizedBox(height: AppDimensions.sm),
-                  const Divider(height: 1),
-
-                  // Content area (uses the sheet's scroll controller so the
-                  // sheet resizes while the content scrolls).
-                  Expanded(child: _buildContent(colors, scrollController)),
-
-                  // Clear the system navigation bar.
-                  SizedBox(height: bottomPadding),
-                ],
-              ),
-            );
+            return false;
           },
+          child: DraggableScrollableSheet(
+            controller: _sheetController,
+            // Don't expand to fill the whole screen: with `expand: true` (the
+            // default) the sheet's internal scrollable covers the full screen
+            // and swallows taps in the space above the sheet, so tapping
+            // outside no longer dismisses the modal (the barrier never sees
+            // the tap). With `expand: false` the scrollable only covers the
+            // sheet itself and the top space returns to the modal barrier.
+            expand: false,
+            initialChildSize: _sheetInitialSize,
+            minChildSize: _sheetMinSize,
+            maxChildSize: _sheetMaxSize,
+            // No snap: the sheet tracks the finger so a downward drag can always
+            // reach [_sheetCloseExtent] and close the sheet from any height.
+            snap: false,
+            builder: (context, scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: colors.surface,
+                  borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(AppDimensions.radiusSheet),
+                  ),
+                ),
+                child: Column(
+                  children: [
+                    // The handle, search bar, and history row are wrapped in a
+                    // GestureDetector so dragging on them also resizes/closes the
+                    // sheet, same as dragging on the content area below.
+                    GestureDetector(
+                      behavior: HitTestBehavior.translucent,
+                      onVerticalDragUpdate: (details) {
+                        // The dismiss pop below can dispose the sheet while the
+                        // drag gesture is still delivering events (the route's
+                        // exit animation keeps the pointer stream alive), which
+                        // detaches the controller mid-gesture. Guard so those
+                        // trailing events no-op instead of asserting.
+                        if (!_sheetController.isAttached) return;
+                        // Use sizeOf() to avoid rebuilding the whole sheet
+                        // when viewInsets change (keyboard open/close).
+                        final screenHeight = MediaQuery.sizeOf(context).height;
+                        final delta = details.primaryDelta! / screenHeight;
+                        final newSize = (_sheetController.size - delta).clamp(
+                          _sheetMinSize,
+                          _sheetMaxSize,
+                        );
+                        _sheetController.jumpTo(newSize);
+                      },
+                      onVerticalDragEnd: (details) {
+                        if (_dismissed || !_sheetController.isAttached) return;
+                        final flick = details.primaryVelocity ?? 0;
+                        if (flick > _kHeaderFlingVelocityPxPerSec ||
+                            _sheetController.size <= _sheetCloseExtent) {
+                          _dismissed = true;
+                          Navigator.of(context).pop();
+                        }
+                      },
+                      child: Column(
+                        children: [
+                          // Drag handle — a visual affordance for the pull-to-close /
+                          // drag-to-expand gesture. The whole sheet is already draggable
+                          // (handled by DraggableScrollableSheet), so this is purely
+                          // decorative.
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 8),
+                            child: Center(
+                              child: Container(
+                                width: 36,
+                                height: 4,
+                                decoration: BoxDecoration(
+                                  color: colors.outlineVariant,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          // Search bar row
+                          Padding(
+                            padding: const EdgeInsets.fromLTRB(
+                              4,
+                              AppDimensions.sm,
+                              AppDimensions.marginMobile - 8,
+                              0,
+                            ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: _searchController,
+                                    focusNode: _focusNode,
+                                    autofocus: _shouldAutofocus,
+                                    textInputAction: TextInputAction.search,
+                                    decoration: InputDecoration(
+                                      hintText: AppLocalizations.of(
+                                        context,
+                                      ).searchPali,
+                                      prefixIcon: Icon(
+                                        Icons.search,
+                                        color: colors.onSurfaceVariant,
+                                      ),
+                                      suffixIcon:
+                                          _searchController.text.isNotEmpty
+                                          ? IconButton(
+                                              icon: const Icon(Icons.clear),
+                                              onPressed: () {
+                                                _searchController.clear();
+                                                _onSearchChanged('');
+                                                _focusNode.requestFocus();
+                                              },
+                                            )
+                                          : null,
+                                      filled: true,
+                                      fillColor: colors.surfaceContainerHighest,
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          AppDimensions.radiusXl,
+                                        ),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                            horizontal: AppDimensions.md,
+                                            vertical: 12,
+                                          ),
+                                    ),
+                                    style: AppTypography.bodyTranslation
+                                        .copyWith(
+                                          color: colors.onSurface,
+                                          fontSize: transSize,
+                                          fontFamily:
+                                              trans.fontFamily.fontFamily,
+                                        ),
+                                    onChanged: _onSearchChanged,
+                                    onSubmitted: _performSearch,
+                                  ),
+                                ),
+                                // Pin to right side panel (desktop only). When pinned,
+                                // the lookup moves to the docked panel and this sheet
+                                // closes.
+                                if (ResponsiveBreakpoint.isDesktop(
+                                  context,
+                                )) ...[
+                                  const SizedBox(width: 4),
+                                  _SheetPinButton(
+                                    word: _query,
+                                    onPinned: () => Navigator.of(context).pop(),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
+                          // Search history row
+                          if (_searchHistory.isNotEmpty)
+                            Container(
+                              height: 40,
+                              margin: const EdgeInsets.only(
+                                top: 8,
+                                left: 16,
+                                right: 16,
+                              ),
+                              child: ListView.separated(
+                                scrollDirection: Axis.horizontal,
+                                itemCount: _searchHistory.length,
+                                separatorBuilder: (context, index) =>
+                                    const SizedBox(width: 8),
+                                itemBuilder: (context, index) {
+                                  return ActionChip(
+                                    label: Text(_searchHistory[index]),
+                                    labelStyle: AppTypography.labelSmall
+                                        .copyWith(
+                                          color: colors.onSurfaceVariant,
+                                        ),
+                                    backgroundColor:
+                                        colors.surfaceContainerHighest,
+                                    side: BorderSide.none,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    onPressed: () {
+                                      _searchController.text =
+                                          _searchHistory[index];
+                                      _performSearch(_searchHistory[index]);
+                                    },
+                                  );
+                                },
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+
+                    const SizedBox(height: AppDimensions.sm),
+                    const Divider(height: 1),
+
+                    // Content area (uses the sheet's scroll controller so the
+                    // sheet resizes while the content scrolls).
+                    Expanded(child: _buildContent(colors, scrollController)),
+
+                    // Clear the system navigation bar.
+                    SizedBox(height: bottomPadding),
+                  ],
+                ),
+              );
+            },
+          ),
         ),
       ),
     );
@@ -1351,9 +1375,9 @@ class _SheetPinButton extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
-    final right = ref.watch(sidePanelProvider).right;
+    final left = ref.watch(sidePanelProvider).left;
     final isPinned =
-        right.openPanel == SidePanelType.dictionary && right.isPinned;
+        left.openPanel == SidePanelType.dictionary && left.isPinned;
 
     return Tooltip(
       message: isPinned

@@ -75,6 +75,10 @@ dependencies:
   flutter_widget_from_html: ^0.15.0
 
   share_plus: ^12.0.2
+  # Native directory/file pickers on desktop — the Translation Builder uses
+  # them to save exported .db files where the user chooses (mobile keeps the
+  # system share sheet).
+  file_selector: ^1.0.3
   app_links: ^7.2.1
 
   # Color picker for settings & startup wizard

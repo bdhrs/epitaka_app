@@ -1,4 +1,4 @@
-/// Riverpod provider managing the Vimaṃsa chat state with the tool-based
+/// Riverpod provider managing the Vīmaṃsā chat state with the tool-based
 /// function calling pipeline and persistent chat threads.
 ///
 /// Architecture (two-model pipeline):
@@ -43,9 +43,9 @@ import 'chat_history_provider.dart';
 
 const _uuid = Uuid();
 
-/// Staged initial prompt to auto-send when the Vimaṃsa screen opens.
+/// Staged initial prompt to auto-send when the Vīmaṃsā screen opens.
 /// Set by the reader's context menu (Explain / Summarize Chapter) before
-/// navigating to the Vimaṃsa screen. The screen reads and clears it on init.
+/// navigating to the Vīmaṃsā screen. The screen reads and clears it on init.
 final aiQaInitialPromptProvider = StateProvider<String?>((ref) => null);
 
 /// Separate providers for streaming text — kept outside [AiQaState] so
@@ -61,7 +61,7 @@ final currentThreadIdProvider = StateProvider<String?>((ref) => null);
 /// Current thread title.
 final currentThreadTitleProvider = StateProvider<String>((ref) => '');
 
-/// StateNotifier managing the Vimaṃsa chat.
+/// StateNotifier managing the Vīmaṃsā chat.
 class AiQaNotifier extends StateNotifier<AiQaState> {
   final Ref _ref;
 
@@ -76,7 +76,8 @@ class AiQaNotifier extends StateNotifier<AiQaState> {
 
   static const _encoder = JsonEncoder.withIndent('  ');
 
-  static const int _maxToolIterations = 8;  // ── Debug log ──────────────────────────────────────────────────────────
+  static const int _maxToolIterations =
+      8; // ── Debug log ──────────────────────────────────────────────────────────
 
   /// Debug log data collected during the current pipeline run.
   Map<String, dynamic> _debugLog = {};
@@ -91,9 +92,9 @@ class AiQaNotifier extends StateNotifier<AiQaState> {
       final file = File(filePath);
       const encoder = JsonEncoder.withIndent('  ');
       await file.writeAsString(encoder.convert(_debugLog));
-      debugPrint('[VIMAṂSA] Debug log saved to: $filePath');
+      debugPrint('[Vīmaṃsā] Debug log saved to: $filePath');
     } catch (e) {
-      debugPrint('[VIMAṂSA] Failed to save debug log: $e');
+      debugPrint('[Vīmaṃsā] Failed to save debug log: $e');
     }
     _debugLog = {};
   }
@@ -154,7 +155,7 @@ $grounding''';
     _finalized = false;
 
     final threadId = _uuid.v4();
-    final threadTitle = title ?? 'Vimaṃsa';
+    final threadTitle = title ?? 'Vīmaṃsā';
 
     final notifier = _ref.read(chatHistoryNotifierProvider);
     final thread = await notifier.createThread(
@@ -322,7 +323,7 @@ $grounding''';
 
     debugPrint('');
     debugPrint('╔══════════════════════════════════════════════════════════');
-    debugPrint('║  VIMAṂSA PIPELINE START');
+    debugPrint('║  Vīmaṃsā PIPELINE START');
     debugPrint('╠══════════════════════════════════════════════════════════');
     debugPrint(
       '║  Thread: ${_ref.read(currentThreadTitleProvider)} ($threadId)',
@@ -347,11 +348,11 @@ $grounding''';
       // Auto-generate thread title from the first user query.
       // If the title is still the default, update it with the query.
       final currentTitle = _ref.read(currentThreadTitleProvider);
-      if (currentTitle == 'Vimaṃsa' || currentTitle.isEmpty) {
+      if (currentTitle == 'Vīmaṃsā' || currentTitle.isEmpty) {
         _updateThreadTitle(threadId, trimmed);
       }
     } catch (e) {
-      debugPrint('[VIMAṂSA] Failed to save user message: $e');
+      debugPrint('[Vīmaṃsā] Failed to save user message: $e');
     }
 
     try {
@@ -364,7 +365,7 @@ $grounding''';
       if (!settings.isValid) {
         state = state.copyWith(
           isLoading: false,
-          error: 'Please configure your API key in the Vimaṃsa settings first.',
+          error: 'Please configure your API key in the Vīmaṃsā settings first.',
         );
         return;
       }
@@ -453,7 +454,7 @@ $grounding''';
           );
         },
         maxIterations: _maxToolIterations,
-        logTag: 'VIMAṂSA',
+        logTag: 'Vīmaṃsā',
       );
 
       // Record tool loop in debug log
@@ -532,7 +533,7 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
           metadata: '{}',
         );
       } catch (e) {
-        debugPrint('[VIMAṂSA] Failed to save placeholder: $e');
+        debugPrint('[Vīmaṃsā] Failed to save placeholder: $e');
         _dbMessageId = null;
       }
 
@@ -556,7 +557,7 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
           _ref.read(streamingTextProvider.notifier).state = accumulatedText;
         },
         onError: (error) {
-          debugPrint('[VIMAṂSA] Stream error: $error');
+          debugPrint('[Vīmaṃsā] Stream error: $error');
           streamError = AiApiClient.friendlyErrorMessage(error);
           _finalizeMessage(accumulatedText, error: streamError);
           if (!streamDone.isCompleted) streamDone.complete();
@@ -594,7 +595,7 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
             metadata: metadata,
           );
         } catch (e) {
-          debugPrint('[VIMAṂSA] Failed to update assistant message: $e');
+          debugPrint('[Vīmaṃsā] Failed to update assistant message: $e');
         }
       }
 
@@ -610,7 +611,7 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
     } catch (e, stack) {
       _debugLog['error'] = '$e';
       _saveDebugLog();
-      debugPrint('[VIMAṂSA] Error: $e\n$stack');
+      debugPrint('[Vīmaṃsā] Error: $e\n$stack');
       final friendlyError = AiApiClient.friendlyErrorMessage(e);
       if (_finalized) {
         // The stream already finished (e.g. DB save failure) — surface the
@@ -629,7 +630,6 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
   }
 
   // ── Tool execution ─────────────────────────────────────────────────────
-
 
   Stream<String> _streamAnswer({
     required AiProvider provider,
@@ -744,6 +744,16 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
     }
   }
 
+  Uri _chatCompletionsUri(String baseUrl) {
+    var value = baseUrl.trim();
+    if (value.isEmpty) value = 'https://api.openai.com/v1';
+    while (value.endsWith('/')) {
+      value = value.substring(0, value.length - 1);
+    }
+    if (value.endsWith('/chat/completions')) return Uri.parse(value);
+    return Uri.parse('$value/chat/completions');
+  }
+
   Stream<String> _openaiStreamAnswer({
     required String model,
     required String apiKey,
@@ -765,10 +775,7 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       'temperature': 0.3,
     };
 
-    final effectiveBase = baseUrl.isNotEmpty
-        ? baseUrl
-        : 'https://api.openai.com/v1';
-    final url = Uri.parse('$effectiveBase/chat/completions');
+    final url = _chatCompletionsUri(baseUrl);
 
     final request = http.Request('POST', url)
       ..headers['Content-Type'] = 'application/json'
@@ -816,7 +823,6 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       httpClient.close();
     }
   }
-
 
   // ── Context building & finalization ───────────────────────────────────
 
@@ -927,7 +933,7 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
     }
     // Remove trailing punctuation
     title = title.replaceAll(RegExp(r'[.:;!?,]+$'), '').trim();
-    if (title.isEmpty) title = 'Vimaṃsa';
+    if (title.isEmpty) title = 'Vīmaṃsā';
 
     _ref.read(currentThreadTitleProvider.notifier).state = title;
     try {
@@ -935,8 +941,15 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
           .read(chatHistoryNotifierProvider)
           .updateThreadTitle(threadId, title);
     } catch (e) {
-      debugPrint('[VIMAṂSA] Failed to update thread title: $e');
+      debugPrint('[Vīmaṃsā] Failed to update thread title: $e');
     }
+  }
+
+  /// Stop the current generation (cancel streaming + finalize).
+  void stopGeneration() {
+    _streamSubscription?.cancel();
+    final text = _ref.read(streamingTextProvider);
+    _finalizeMessage(text);
   }
 
   /// Dismiss the current error.
@@ -951,7 +964,7 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
   }
 }
 
-/// Provider for the Vimaṃsa chat state.
+/// Provider for the Vīmaṃsā chat state.
 final aiQaProvider = StateNotifierProvider<AiQaNotifier, AiQaState>((ref) {
   return AiQaNotifier(ref);
 });

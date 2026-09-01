@@ -1,6 +1,16 @@
 import 'package:flutter/material.dart';
 import 'pali_script_converter.dart';
 
+/// Returns true when [text] contains only Roman/Latin characters
+/// (no Devanagari, Sinhala, Thai, Myanmar, Khmer, etc.).
+///
+/// Used by input fields to decide whether Velthuis diacritic conversion
+/// should be applied to the display text: for non-Roman scripts the
+/// controller is left untouched so the user keeps seeing their native
+/// script, while the search/lookup still receives the Roman-converted
+/// result from [velthuis].
+bool isRomanScript(String text) => !isNonLatinScript(text);
+
 /// Velthuis-to-Unicode Pāḷi converter.
 ///
 /// Converts ASCII representations of Pāḷi diacritics into proper Unicode.

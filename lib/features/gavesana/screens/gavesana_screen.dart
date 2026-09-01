@@ -9,7 +9,7 @@ import '../widgets/gavesana_search_view.dart';
 ///
 /// The user describes what they're looking for; an AI model plans and runs
 /// the searches against the local Tipitaka databases (using the same
-/// tool-calling engine as Vimaṃsa), then the passages it gathers are shown
+/// tool-calling engine as Vīmaṃsā), then the passages it gathers are shown
 /// in the normal search results format.
 ///
 /// The search bar and all AI states live in the shared [GavesanaSearchView]

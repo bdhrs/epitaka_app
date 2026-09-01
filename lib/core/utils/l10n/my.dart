@@ -535,10 +535,10 @@ const Map<String, String> my = {
 
   'Semantic search': 'အနက်ရှာဖွေမှု',
   'Investigation & exploration': 'စူးစမ်းလေ့လာမှု နှင့် ရှာဖွေတွေ့ရှိမှု',
-  'Tipitaka': 'တိပိဋက',
+  'Tipiṭaka': 'တိပိဋက',
   'Feedback': 'အကြံပြုချက်',
   'Pāli Tipiṭaka Reader': 'ပါဠိတိပိဋက ဖတ်ရှုစနစ်',
-  'Vimaṃsa': 'ဝီမံသ',
+  'Vīmaṃsā': 'ဝီမံသ',
 
   // ── Gavesana FTS Build Dialog ───────────────────────────────────────
 
@@ -672,22 +672,22 @@ const Map<String, String> my = {
   'Reset layout': 'အပြင်အဆင် ပြန်သတ်မှတ်ရန်',
 
   // ── Gavesana ────────────────────────────────────────────────────────
-  'Gavesana': 'ဂဝေသန',
+  'Gavesanā': 'ဂဝေသန',
   'Gavesana AI Search': 'ဂဝေသန AI ရှာဖွေမှု',
   'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesana panel for detailed results.':
       'တိပိဋကတစ်ခုလုံးကို AI အနက်ရှာဖွေမှု။\n\nအသေးစိတ်ရလဒ်များအတွက် ဂဝေသနအပြည့်အစုံဘောင်ကို ဖွင့်ပါ။',
 
-  // ── AI Q&A (Vimaṃsa) ────────────────────────────────────────────────
+  // ── AI Q&A (Vīmaṃsā) ────────────────────────────────────────────────
   'Navigation menu': 'လမ်းညွှန်မီနူး',
   'Chat history': 'စကားဝိုင်းမှတ်တမ်း',
   'New chat': 'စကားဝိုင်းအသစ်',
   'Clear chat': 'စကားဝိုင်း ရှင်းမည်',
-  'Vimaṃsa Settings': 'ဝီမံသ ဆက်တင်များ',
+  'Vīmaṃsā Settings': 'ဝီမံသ ဆက်တင်များ',
   'Building heading index…': 'ခေါင်းစဉ်အညွှန်း တည်ဆောက်နေသည်…',
   'Heading index needed for @ — build now?':
       '@ အတွက် ခေါင်းစဉ်အညွှန်း လိုအပ်သည် — ယခု တည်ဆောက်မည်လား?',
   'Ask about the Tipitaka': 'တိပိဋကအကြောင်း မေးမည်',
-  'Vimaṃsa — investigation through questioning.\n'
+  'Vīmaṃsā — investigation through questioning.\n'
           'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
           'and provides detailed answers with clickable citations.\n'
           'Each chat thread is saved — you can continue later.':

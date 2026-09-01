@@ -183,11 +183,11 @@ class SidePanelNotifier extends StateNotifier<SidePanelsState> {
 
   /// Update panel data (for dictionary word changes without toggling).
   void updateDictionaryWord(String word) {
-    final right = state.right;
-    if (right.openPanel == SidePanelType.dictionary) {
+    final left = state.left;
+    if (left.openPanel == SidePanelType.dictionary) {
       state = SidePanelsState(
-        left: state.left,
-        right: right.copyWith(panelData: word),
+        left: left.copyWith(panelData: word),
+        right: state.right,
       );
     }
   }
@@ -197,7 +197,7 @@ class SidePanelNotifier extends StateNotifier<SidePanelsState> {
   PanelSlot _slotFor(SidePanelType panel) {
     switch (panel) {
       case SidePanelType.dictionary:
-        return PanelSlot.right;
+        return PanelSlot.left;
       case SidePanelType.library:
       case SidePanelType.gavesana:
       case SidePanelType.history:

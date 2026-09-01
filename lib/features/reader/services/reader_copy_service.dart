@@ -403,7 +403,7 @@ class ReaderCopyService {
           colors: colors,
         );
       case ContextMenuBuiltins.explain:
-        // ── Explain (send to Vimaṃsa AI) ────────────────────────────
+        // ── Explain (send to Vīmaṃsā AI) ────────────────────────────
         if (onExplainTap == null) return const SizedBox.shrink();
         return ContextMenuButton(
           icon: Icons.auto_awesome,
@@ -415,7 +415,7 @@ class ReaderCopyService {
           colors: colors,
         );
       case ContextMenuBuiltins.summarizeChapter:
-        // ── Summarize Chapter (send to Vimaṃsa AI) ──────────────────
+        // ── Summarize Chapter (send to Vīmaṃsā AI) ──────────────────
         if (onSummarizeChapterTap == null) return const SizedBox.shrink();
         return ContextMenuButton(
           icon: Icons.notes,

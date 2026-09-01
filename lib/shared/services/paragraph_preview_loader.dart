@@ -1,6 +1,6 @@
 /// Shared loader for paragraph-excerpt previews.
 ///
-/// Both the AI-citation quickview (vimaṃsa) and the outline section quickview
+/// Both the AI-citation quickview (Vīmaṃsā) and the outline section quickview
 /// show a passage as Pāli + translation lines before the user commits to
 /// opening the reader — this single loader keeps that logic in one place so
 /// the two features never drift apart.
@@ -52,10 +52,10 @@ Future<ParagraphPreviewData> loadParagraphPreview(
 
   final headingTitle =
       (await epitakaDb.getHeadingTitleAtPara(
-            bookId,
-            paraId,
-            includeLevel10: true,
-          )) ??
+        bookId,
+        paraId,
+        includeLevel10: true,
+      )) ??
       '';
 
   final sentenceRows = await epitakaDb

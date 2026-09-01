@@ -21,6 +21,7 @@ Future<void> showCitationQuickview(
   required String bookName,
   required int paraId,
   int? lineId,
+  int? lineIdTo,
 }) async {
   HapticFeedback.mediumImpact();
 
@@ -54,6 +55,11 @@ Future<void> showCitationQuickview(
     // highlight instead of highlighting nothing.
     final hasExactCitedLine = lineId != null &&
         previewLines.any((l) => l.paraId == paraId && l.lineId == lineId);
+    // Build footer showing the line range (e.g. "§5:3-7").
+    final String? footer = lineIdTo != null
+        ? '§$paraId:$lineId-$lineIdTo'
+        : (lineId != null ? '§$paraId:$lineId' : null);
+
     await showParagraphPreviewSheet(
       context,
       title: headingTitle.isNotEmpty ? headingTitle : bookName,
@@ -64,6 +70,7 @@ Future<void> showCitationQuickview(
       firstSnippetIndex: previewLines.indexWhere((l) => l.paraId == paraId),
       scrollToParaId: paraId,
       scrollToLineId: lineId,
+      footer: footer,
       actionLabel: AppLocalizations.of(context).openInReader,
       // Open at the position the user stopped reading in the sheet, not the
       // original citation line.
@@ -87,7 +94,7 @@ Future<void> showCitationQuickview(
       final loc = AppLocalizations.of(context);
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(SnackBar(content: Text(loc.couldNotLoadPreviewMsg + '$e')));
+      ).showSnackBar(SnackBar(content: Text('${loc.couldNotLoadPreviewMsg}$e')));
     }
   }
 }

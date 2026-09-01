@@ -535,10 +535,10 @@ const Map<String, String> si = {
 
   'Semantic search': 'අර්ථාන්විත සෙවුම',
   'Investigation & exploration': 'පරීක්ෂණය සහ ගවේෂණය',
-  'Tipitaka': 'ත්‍රිපිටකය',
+  'Tipiṭaka': 'ත්‍රිපිටකය',
   'Feedback': 'ප්‍රතිපෝෂණය',
   'Pāli Tipiṭaka Reader': 'පාලි ත්‍රිපිටක කියවනය',
-  'Vimaṃsa': 'විමංස',
+  'Vīmaṃsā': 'විමංස',
 
   // ── Gavesana FTS Build Dialog ───────────────────────────────────────
 
@@ -669,22 +669,22 @@ const Map<String, String> si = {
   'Reset layout': 'පිරිසැලසුම යළි පිහිටුවන්න',
 
   // ── Gavesana ────────────────────────────────────────────────────────
-  'Gavesana': 'ගවේෂණ',
+  'Gavesanā': 'ගවේෂණ',
   'Gavesana AI Search': 'ගවේෂණ AI සෙවුම',
   'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesana panel for detailed results.':
       'ත්‍රිපිටකය පුරා AI බලගැන්වූ අර්ථාන්විත සෙවුම.\n\nවිස්තරාත්මක ප්‍රතිඵල සඳහා සම්පූර්ණ ගවේෂණ පැනලය විවෘත කරන්න.',
 
-  // ── AI Q&A (Vimaṃsa) ────────────────────────────────────────────────
+  // ── AI Q&A (Vīmaṃsā) ────────────────────────────────────────────────
   'Navigation menu': 'සංචලන මෙනුව',
   'Chat history': 'කතාබහ ඉතිහාසය',
   'New chat': 'නව කතාබහක්',
   'Clear chat': 'කතාබහ හිස් කරන්න',
-  'Vimaṃsa Settings': 'විමංස සැකසුම්',
+  'Vīmaṃsā Settings': 'විමංස සැකසුම්',
   'Building heading index…': 'මාතෘකා දර්ශකය තනමින්…',
   'Heading index needed for @ — build now?':
       '@ සඳහා මාතෘකා දර්ශකයක් අවශ්‍යයි — දැන් තනන්නද?',
   'Ask about the Tipitaka': 'ත්‍රිපිටකය ගැන අසන්න',
-  'Vimaṃsa — investigation through questioning.\n'
+  'Vīmaṃsā — investigation through questioning.\n'
           'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
           'and provides detailed answers with clickable citations.\n'
           'Each chat thread is saved — you can continue later.':

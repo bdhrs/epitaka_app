@@ -3,10 +3,13 @@
 // Live run screen for the Translation Builder: shows per-book / section /
 // chunk progress, a scrolling log, a cancel button while running, and after
 // completion a "Share the database" action that exports the target
-// epitaka_<lang>.db via the system share sheet.
+// epitaka_<lang>.db via the system share sheet. On desktop, where a share
+// sheet is a poor fit, the export instead opens a native directory picker so
+// the user chooses where to save the file(s).
 
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -18,6 +21,7 @@ import '../../../core/models/translation_version.dart'
 import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/database_initializer.dart';
+import '../../../core/utils/platform_info.dart';
 import '../../settings/widgets/settings_app_bar.dart';
 import '../providers/translator_provider.dart';
 import '../translator_constants.dart';
@@ -60,6 +64,45 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
     });
   }
 
+  /// Desktop has no useful share sheet — let the user pick a directory and
+  /// copy exported files straight into it instead.
+  bool get _useDirectoryPicker => PlatformInfo.isDesktop;
+
+  /// Ask the user where to save [fileNames], then copy [sources] into that
+  /// directory under those names. Returns false if cancelled or failed.
+  Future<bool> _saveFilesToDirectory({
+    required List<String> fileNames,
+    required List<File> sources,
+    required String confirmButtonText,
+  }) async {
+    final dirPath = await getDirectoryPath(confirmButtonText: confirmButtonText);
+    if (dirPath == null) return false;
+    try {
+      for (var i = 0; i < sources.length; i++) {
+        await sources[i].copy(p.join(dirPath, fileNames[i]));
+      }
+    } catch (e) {
+      if (!mounted) return false;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Could not save to $dirPath: $e'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return false;
+    }
+    if (!mounted) return false;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(fileNames.length == 1
+            ? 'Saved ${fileNames.first} to $dirPath'
+            : 'Saved ${fileNames.length} files to $dirPath'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+    return true;
+  }
+
   Future<void> _shareDatabase() async {
     final settings = ref.read(translatorSettingsProvider);
     final dir = await getDatabaseDirectory();
@@ -75,6 +118,14 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
           content: Text('No database file found yet.'),
           behavior: SnackBarBehavior.floating,
         ),
+      );
+      return;
+    }
+    if (_useDirectoryPicker) {
+      await _saveFilesToDirectory(
+        fileNames: [p.basename(path)],
+        sources: [file],
+        confirmButtonText: 'Save database',
       );
       return;
     }
@@ -107,6 +158,14 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
           content: Text('No prompt/response files yet — run at least one chunk.'),
           behavior: SnackBarBehavior.floating,
         ),
+      );
+      return;
+    }
+    if (_useDirectoryPicker) {
+      await _saveFilesToDirectory(
+        fileNames: files.map((f) => p.basename(f.path)).toList(),
+        sources: files.map((f) => File(f.path)).toList(),
+        confirmButtonText: 'Save prompt & response',
       );
       return;
     }
@@ -275,13 +334,18 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
                       ),
                       OutlinedButton.icon(
                         onPressed: _shareDatabase,
-                        icon: const Icon(Icons.share),
-                        label: const Text('Share DB'),
+                        icon: Icon(_useDirectoryPicker
+                            ? Icons.save_alt
+                            : Icons.share),
+                        label:
+                            Text(_useDirectoryPicker ? 'Save DB…' : 'Share DB'),
                       ),
                       OutlinedButton.icon(
                         onPressed: _shareLastExchange,
                         icon: const Icon(Icons.swap_vert),
-                        label: const Text('Share prompt & response'),
+                        label: Text(_useDirectoryPicker
+                            ? 'Save prompt & response…'
+                            : 'Share prompt & response'),
                       ),
                     ],
                   ],

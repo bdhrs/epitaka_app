@@ -295,9 +295,9 @@ const Map<String, String> en = {
   'Any': 'Any',
 
   // ── Gavesana (AI search) ────────────────────────────────────────────
-  'Gavesana (AI Search)': 'Gavesana (AI Search)',
+  'Gavesanā (AI Search)': 'Gavesanā (AI Search)',
 
-  'Open Gavesana': 'Open Gavesana',
+  'Open Gavesanā': 'Open Gavesanā',
   'found': 'found',
   'Section headings': 'Section headings',
   'Describe what you\u2019re looking for — the AI will search the Tipitaka for relevant passages.':
@@ -310,8 +310,8 @@ const Map<String, String> en = {
   'The AI could not find any relevant passages. Try a different description.':
       'The AI could not find any relevant passages. Try a different description.',
   'Configure AI in Settings': 'Configure AI in Settings',
-  'Gavesana AI search needs an API key. Configure it in Settings → AI Q&A.':
-      'Gavesana AI search needs an API key. Configure it in Settings → AI Q&A.',
+  'Gavesanā AI search needs an API key. Configure it in Settings → AI Q&A.':
+      'Gavesanā AI search needs an API key. Configure it in Settings → AI Q&A.',
 
   // ── Translation Builder ────────────────────────────────────────────
   'Translation Builder': 'Translation Builder',
@@ -422,6 +422,13 @@ const Map<String, String> en = {
   'Conflict': 'Conflict',
   'Add remark': 'Add remark',
   'Pāli speed': 'Pāli speed',
+  'Pāli voice': 'Pāli voice',
+  'Translation voice': 'Translation voice',
+  'Hindi voice not installed': 'Hindi voice not installed',
+  'Hindi voice missing desc':
+      'A Hindi (Devanagari) voice is needed to read Pāli aloud. '
+      'Install one in your device Text-to-Speech settings.',
+  'Install Hindi voice': 'Install Hindi voice',
 
   // ── TTS Replacements ────────────────────────────────────────────────
   'Replace text patterns before TTS reads them aloud.':
@@ -736,10 +743,10 @@ const Map<String, String> en = {
 
   'Semantic search': 'Semantic search',
   'Investigation & exploration': 'Investigation & exploration',
-  'Tipitaka': 'Tipitaka',
+  'Tipiṭaka': 'Tipiṭaka',
   'Feedback': 'Feedback',
   'Pāli Tipiṭaka Reader': 'Pāli Tipiṭaka Reader',
-  'Vimaṃsa': 'Vimaṃsa',
+  'Vīmaṃsā': 'Vīmaṃsā',
 
   // ── Gavesana FTS Build Dialog ───────────────────────────────────────
 
@@ -873,27 +880,27 @@ const Map<String, String> en = {
   'Reset layout': 'Reset layout',
 
   // ── Gavesana ────────────────────────────────────────────────────────
-  'Gavesana': 'Gavesana',
-  'Gavesana AI Search': 'Gavesana AI Search',
-  'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesana panel for detailed results.':
-      'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesana panel for detailed results.',
+  'Gavesanā': 'Gavesanā',
+  'Gavesanā AI Search': 'Gavesanā AI Search',
+  'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesanā panel for detailed results.':
+      'AI-powered semantic search across the Tipiṭaka.\n\nOpen the full Gavesanā panel for detailed results.',
 
-  // ── AI Q&A (Vimaṃsa) ────────────────────────────────────────────────
+  // ── AI Q&A (Vīmaṃsā) ────────────────────────────────────────────────
   'Navigation menu': 'Navigation menu',
   'Chat history': 'Chat history',
   'New chat': 'New chat',
   'Clear chat': 'Clear chat',
-  'Vimaṃsa Settings': 'Vimaṃsa Settings',
+  'Vīmaṃsā Settings': 'Vīmaṃsā Settings',
   'Building heading index…': 'Building heading index…',
   'Heading index needed for @ — build now?':
       'Heading index needed for @ — build now?',
   'Ask about the Tipitaka': 'Ask about the Tipitaka',
-  'Vimaṃsa — investigation through questioning.\n'
-          'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
+  'Vīmaṃsā — investigation through questioning.\n'
+          'The AI searches the Tipiṭaka using tools, gathers relevant passages,\n'
           'and provides detailed answers with clickable citations.\n'
           'Each chat thread is saved — you can continue later.':
-      'Vimaṃsa — investigation through questioning.\n'
-      'The AI searches the Tipitaka using tools, gathers relevant passages,\n'
+      'Vīmaṃsā — investigation through questioning.\n'
+      'The AI searches the Tipiṭaka using tools, gathers relevant passages,\n'
       'and provides detailed answers with clickable citations.\n'
       'Each chat thread is saved — you can continue later.',
   'View past conversations': 'View past conversations',
@@ -1013,8 +1020,8 @@ const Map<String, String> en = {
       'Copy Link — copy a shareable link to this exact passage.',
   'Dictionary — look up the selected word.':
       'Dictionary — look up the selected word.',
-  'Explain — ask Vimaṃsa AI to explain the selection.':
-      'Explain — ask Vimaṃsa AI to explain the selection.',
+  'Explain — ask Vīmaṃsā AI to explain the selection.':
+      'Explain — ask Vīmaṃsā AI to explain the selection.',
   'Summarize Ch. — summarize the current chapter with AI.':
       'Summarize Ch. — summarize the current chapter with AI.',
   'Share — share the selection via the system share sheet.':
@@ -1037,15 +1044,15 @@ const Map<String, String> en = {
       'Text-to-Speech — voice, speed, pitch and word replacements.',
   'Dictionaries — enable, disable and reorder dictionaries.':
       'Dictionaries — enable, disable and reorder dictionaries.',
-  'AI Q&A — enter your API key and pick models for Vimaṃsa.':
-      'AI Q&A — enter your API key and pick models for Vimaṃsa.',
+  'AI Q&A — enter your API key and pick models for Vīmaṃsā.':
+      'AI Q&A — enter your API key and pick models for Vīmaṃsā.',
 
-  // ── Feature Guide: AI (Vimaṃsa) ───────────────────────────────────
-  'AI — Vimaṃsa': 'AI — Vimaṃsa',
+  // ── Feature Guide: AI (Vīmaṃsā) ───────────────────────────────────
+  'AI — Vīmaṃsā': 'AI — Vīmaṃsā',
   'Ask the AI about the Tipiṭaka. It searches the Canon and answers with citations.':
       'Ask the AI about the Tipiṭaka. It searches the Canon and answers with citations.',
-  'Ask a question — open Vimaṃsa from the menu and ask anything.':
-      'Ask a question — open Vimaṃsa from the menu and ask anything.',
+  'Ask a question — open Vīmaṃsā from the menu and ask anything.':
+      'Ask a question — open Vīmaṃsā from the menu and ask anything.',
   'Explain — select text in the reader and tap Explain for a commentary-grounded explanation.':
       'Explain — select text in the reader and tap Explain for a commentary-grounded explanation.',
   'Summarize — tap Summarize Ch. to get an overview of the current chapter.':

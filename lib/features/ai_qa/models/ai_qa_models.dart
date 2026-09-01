@@ -1,6 +1,6 @@
-/// Data models for the Vimaṃsa (AI Q&A) feature.
+/// Data models for the Vīmaṃsā (AI Q&A) feature.
 ///
-/// Vimaṃsa (विमंसा) means investigation, examination, or exploration —
+/// Vīmaṃsā (विमंसा) means investigation, examination, or exploration —
 /// the systematic probing of the Dhamma through questioning.
 ///
 /// Unlike the existing AI Assistant (Paññā) which pre-searches the DB and
@@ -19,7 +19,7 @@ const _uuid = Uuid();
 //  CHAT THREAD
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// A single chat thread in Vimaṃsa.
+/// A single chat thread in Vīmaṃsā.
 class ChatThread {
   final String id;
   final String title;
@@ -27,6 +27,7 @@ class ChatThread {
   final DateTime updatedAt;
   final int messageCount;
   final int maxMessages;
+  final bool isPinned;
 
   const ChatThread({
     required this.id,
@@ -35,6 +36,7 @@ class ChatThread {
     required this.updatedAt,
     this.messageCount = 0,
     this.maxMessages = 8,
+    this.isPinned = false,
   });
 
   bool get isFull => messageCount >= maxMessages;
@@ -46,6 +48,7 @@ class ChatThread {
     'updated_at': updatedAt.toIso8601String(),
     'message_count': messageCount,
     'max_messages': maxMessages,
+    'is_pinned': isPinned,
   };
 
   factory ChatThread.fromJson(Map<String, dynamic> json) {
@@ -56,6 +59,7 @@ class ChatThread {
       updatedAt: DateTime.parse(json['updated_at'] as String),
       messageCount: (json['message_count'] as num?)?.toInt() ?? 0,
       maxMessages: (json['max_messages'] as num?)?.toInt() ?? 8,
+      isPinned: json['is_pinned'] as bool? ?? false,
     );
   }
 
@@ -64,6 +68,7 @@ class ChatThread {
     DateTime? updatedAt,
     int? messageCount,
     int? maxMessages,
+    bool? isPinned,
   }) {
     return ChatThread(
       id: id,
@@ -72,6 +77,7 @@ class ChatThread {
       updatedAt: updatedAt ?? this.updatedAt,
       messageCount: messageCount ?? this.messageCount,
       maxMessages: maxMessages ?? this.maxMessages,
+      isPinned: isPinned ?? this.isPinned,
     );
   }
 }
@@ -103,7 +109,7 @@ class ChatMessageRecord {
 //  SETTINGS
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Persisted settings for the Vimaṃsa feature.
+/// Persisted settings for the Vīmaṃsā feature.
 class AiQaSettings {
   /// Gemini API key (or any Google AI Studio key).
   final String apiKey;
@@ -138,6 +144,9 @@ class AiQaSettings {
   /// Defaults to true.
   final bool orthodoxMode;
 
+  /// Chat font size scale (1.0 = default). Persisted across sessions.
+  final double chatFontSize;
+
   const AiQaSettings({
     this.apiKey = '',
     this.provider = AiProvider.gemini,
@@ -149,6 +158,7 @@ class AiQaSettings {
     this.answerMaxTokens = 64000,
     this.maxQueriesPerChat = 8,
     this.orthodoxMode = true,
+    this.chatFontSize = 1.0,
   });
 
   bool get isValid {
@@ -167,6 +177,7 @@ class AiQaSettings {
     int? answerMaxTokens,
     int? maxQueriesPerChat,
     bool? orthodoxMode,
+    double? chatFontSize,
   }) {
     return AiQaSettings(
       apiKey: apiKey ?? this.apiKey,
@@ -179,6 +190,7 @@ class AiQaSettings {
       answerMaxTokens: answerMaxTokens ?? this.answerMaxTokens,
       maxQueriesPerChat: maxQueriesPerChat ?? this.maxQueriesPerChat,
       orthodoxMode: orthodoxMode ?? this.orthodoxMode,
+      chatFontSize: chatFontSize ?? this.chatFontSize,
     );
   }
 
@@ -193,6 +205,7 @@ class AiQaSettings {
     'answerMaxTokens': answerMaxTokens,
     'maxQueriesPerChat': maxQueriesPerChat,
     'orthodoxMode': orthodoxMode,
+    'chatFontSize': chatFontSize,
   };
 
   factory AiQaSettings.fromJson(Map<String, dynamic> json) {
@@ -208,6 +221,7 @@ class AiQaSettings {
       answerMaxTokens: (json['answerMaxTokens'] as num?)?.toInt() ?? 64000,
       maxQueriesPerChat: (json['maxQueriesPerChat'] as num?)?.toInt() ?? 8,
       orthodoxMode: json['orthodoxMode'] as bool? ?? true,
+      chatFontSize: (json['chatFontSize'] as num?)?.toDouble() ?? 1.0,
     );
   }
 }
@@ -261,7 +275,7 @@ class SourceCitation {
 //  MESSAGE
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// A single message in the Vimaṃsa chat.
+/// A single message in the Vīmaṃsā chat.
 class AiQaMessage {
   final String id;
   final String text;
@@ -364,7 +378,7 @@ class ToolCallLog {
 //  STATE
 // ═══════════════════════════════════════════════════════════════════════════
 
-/// Full state of the Vimaṃsa chat interface.
+/// Full state of the Vīmaṃsā chat interface.
 class AiQaState {
   /// Chat message history.
   final List<AiQaMessage> messages;

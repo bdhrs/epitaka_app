@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show SelectedContent;
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/settings_provider.dart';
 import '../../core/utils/app_localizations.dart';
 import '../../core/theme/app_dimensions.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/native_lookup_service.dart';
 import '../../features/dictionary/widgets/dictionary_open.dart';
 import 'pali_text.dart';
 import 'preview_content.dart';
@@ -122,6 +125,9 @@ class _ParagraphPreviewSheetState extends ConsumerState<_ParagraphPreviewSheet> 
 
   bool _didScrollToTarget = false;
   int _scrollRetries = 0;
+
+  /// Track the last text selection for the context menu's dictionary lookup.
+  SelectedContent? _lastSelectedContent;
 
   /// Index into [widget.lines] the sheet lands on when it opens — the exact
   /// scrollTo line, or the first line of the target paragraph when the exact
@@ -242,6 +248,71 @@ class _ParagraphPreviewSheetState extends ConsumerState<_ParagraphPreviewSheet> 
     final (paraId, lineId) = _currentAnchor();
     onAction(paraId, lineId);
   }
+
+  /// Context menu shown when the user selects text inside the preview.
+  /// Includes a "Search" action to look up the selection in the dictionary.
+  Widget _selectionContextMenu(
+    BuildContext context,
+    SelectableRegionState selectableRegionState,
+  ) {
+    final loc = AppLocalizations.of(context);
+    TextSelectionToolbarAnchors anchors;
+    try {
+      anchors = selectableRegionState.contextMenuAnchors;
+    } catch (_) {
+      anchors = const TextSelectionToolbarAnchors(primaryAnchor: Offset.zero);
+    }
+
+    final raw = _lastSelectedContent?.plainText;
+    final searchable = raw == null || raw.trim().isEmpty
+        ? null
+        : raw.replaceAll('\uFFFC', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: anchors,
+      buttonItems: [
+        if (searchable != null)
+          ContextMenuButtonItem(
+            label: '${loc.search} "${_truncateLabel(searchable)}"',
+            onPressed: () {
+              selectableRegionState.clearSelection();
+              openDictionaryInPanel(
+                context,
+                ref,
+                searchable,
+                closeSheet: true,
+              );
+            },
+          ),
+        if (searchable != null && NativeLookupService.isSupported)
+          ContextMenuButtonItem(
+            label: '${loc.lookUp} "${_truncateLabel(searchable)}"',
+            onPressed: () {
+              selectableRegionState.clearSelection();
+              NativeLookupService.lookUp(searchable);
+            },
+          ),
+        ContextMenuButtonItem(
+          label: loc.copy,
+          onPressed: () {
+            final text = _lastSelectedContent?.plainText;
+            if (text != null && text.isNotEmpty) {
+              Clipboard.setData(ClipboardData(text: text));
+            }
+            selectableRegionState.clearSelection();
+          },
+        ),
+        ContextMenuButtonItem(
+          label: loc.selectAll,
+          onPressed: () =>
+              selectableRegionState.selectAll(SelectionChangedCause.toolbar),
+        ),
+      ],
+    );
+  }
+
+  static String _truncateLabel(String s) =>
+      s.length <= 28 ? s : '${s.substring(0, 28)}\u2026';
 
   @override
   Widget build(BuildContext context) {
@@ -376,24 +447,31 @@ class _ParagraphPreviewSheetState extends ConsumerState<_ParagraphPreviewSheet> 
                             const SizedBox(height: 16),
                           ],
 
-                          PreviewContent(
-                            lines: w.lines,
-                            highlightParaId: w.highlightParaId,
-                            highlightLineId: w.highlightLineId,
-                            firstSnippetIndex: w.firstSnippetIndex,
-                            paliSnippet: w.paliSnippet,
-                            lineKeys: _lineKeys,
-                            onPaliWordTap: (word) {
-                              // Close the preview sheet and open the dictionary
-                              // in the panel/dock instead (desktop sidebar or
-                              // mobile bottom dock).
-                              openDictionaryInPanel(
-                                context,
-                                ref,
-                                word,
-                                closeSheet: true,
-                              );
+                          SelectionArea(
+                            onSelectionChanged: (content) {
+                              _lastSelectedContent = content;
                             },
+                            contextMenuBuilder: (context, selectableRegionState) =>
+                                _selectionContextMenu(context, selectableRegionState),
+                            child: PreviewContent(
+                              lines: w.lines,
+                              highlightParaId: w.highlightParaId,
+                              highlightLineId: w.highlightLineId,
+                              firstSnippetIndex: w.firstSnippetIndex,
+                              paliSnippet: w.paliSnippet,
+                              lineKeys: _lineKeys,
+                              onPaliWordTap: (word) {
+                                // Close the preview sheet and open the dictionary
+                                // in the panel/dock instead (desktop sidebar or
+                                // mobile bottom dock).
+                                openDictionaryInPanel(
+                                  context,
+                                  ref,
+                                  word,
+                                  closeSheet: true,
+                                );
+                              },
+                            ),
                           ),
 
                           // ── Optional footer (e.g. para/line ref badge) ─

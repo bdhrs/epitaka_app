@@ -1,4 +1,4 @@
-/// Riverpod provider for the Vimaṃsa settings (API key, model selection,
+/// Riverpod provider for the Vīmaṃsā settings (API key, model selection,
 /// custom system prompt).
 ///
 /// Settings are persisted to SharedPreferences under the key
@@ -105,6 +105,12 @@ class AiQaSettingsNotifier extends StateNotifier<AiQaSettings> {
     await _persist();
   }
 
+  /// Set the chat font size scale (1.0 = default).
+  Future<void> setChatFontSize(double value) async {
+    state = state.copyWith(chatFontSize: value.clamp(0.7, 2.0));
+    await _persist();
+  }
+
   /// Update multiple settings at once.
   Future<void> updateAll(AiQaSettings newSettings) async {
     state = newSettings;
@@ -121,5 +127,5 @@ class AiQaSettingsNotifier extends StateNotifier<AiQaSettings> {
 /// Provider for [AiQaSettings].
 final aiQaSettingsProvider =
     StateNotifierProvider<AiQaSettingsNotifier, AiQaSettings>((ref) {
-  return AiQaSettingsNotifier();
-});
+      return AiQaSettingsNotifier();
+    });

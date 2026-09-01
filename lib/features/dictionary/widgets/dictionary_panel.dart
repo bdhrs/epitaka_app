@@ -130,7 +130,11 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
     _debounce?.cancel();
 
     final converted = velthuis(value);
-    if (converted != value && converted.trim().isNotEmpty) {
+    // Only update the display for Roman-script input; non-Roman
+    // scripts (Sinhala, Thai, Myanmar, …) pass through unchanged.
+    if (isRomanScript(value) &&
+        converted != value &&
+        converted.trim().isNotEmpty) {
       _isConverting = true;
       _searchController.value = convertedTextEditingValue(
         _searchController.value,

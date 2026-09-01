@@ -64,9 +64,17 @@ class _SearchScreenState extends ConsumerState<SearchScreen> {
     // Prevent re-entry when updating the controller text after Velthuis conversion
     if (_isConverting) return;
 
-    // Apply Velthuis conversion and update the displayed text on-the-fly
+    // Apply Velthuis conversion (converts any script → Roman IAST).
     final converted = velthuis(value);
-    if (converted != value && converted.trim().isNotEmpty) {
+
+    // Only update the *displayed* text for Roman-script input where
+    // Velthuis diacritics are meaningful (aa→ā, .t→ṭ, etc.).
+    // For non-Roman scripts (Sinhala, Thai, Myanmar, …) leave the
+    // controller untouched so the user keeps seeing their native script;
+    // the search still uses the Roman-converted `converted` value below.
+    if (isRomanScript(value) &&
+        converted != value &&
+        converted.trim().isNotEmpty) {
       _isConverting = true;
       _searchController.value = convertedTextEditingValue(
         _searchController.value,

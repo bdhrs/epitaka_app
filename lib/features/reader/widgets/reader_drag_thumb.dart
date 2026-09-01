@@ -69,18 +69,21 @@ class _ReaderDragThumbState extends State<ReaderDragThumb> {
   @override
   void initState() {
     super.initState();
-    widget.itemPositionsListener?.itemPositions
-        .addListener(_onPositionsChanged);
+    widget.itemPositionsListener?.itemPositions.addListener(
+      _onPositionsChanged,
+    );
   }
 
   @override
   void didUpdateWidget(ReaderDragThumb oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.itemPositionsListener != widget.itemPositionsListener) {
-      oldWidget.itemPositionsListener?.itemPositions
-          .removeListener(_onPositionsChanged);
-      widget.itemPositionsListener?.itemPositions
-          .addListener(_onPositionsChanged);
+      oldWidget.itemPositionsListener?.itemPositions.removeListener(
+        _onPositionsChanged,
+      );
+      widget.itemPositionsListener?.itemPositions.addListener(
+        _onPositionsChanged,
+      );
     }
     if (oldWidget.readerState.paragraphs.length !=
         widget.readerState.paragraphs.length) {
@@ -94,8 +97,9 @@ class _ReaderDragThumbState extends State<ReaderDragThumb> {
 
   @override
   void dispose() {
-    widget.itemPositionsListener?.itemPositions
-        .removeListener(_onPositionsChanged);
+    widget.itemPositionsListener?.itemPositions.removeListener(
+      _onPositionsChanged,
+    );
     super.dispose();
   }
 
@@ -108,13 +112,17 @@ class _ReaderDragThumbState extends State<ReaderDragThumb> {
   void _updateScrollRatio(Iterable<ItemPosition>? positions) {
     if (positions == null || positions.isEmpty) return;
 
-    final visible = positions
-        .where((p) => p.itemTrailingEdge > 0)
-        .toList()
-      ..sort((a, b) => a.itemLeadingEdge.compareTo(b.itemLeadingEdge));
-    if (visible.isEmpty) return;
+    ItemPosition? topVisible;
+    for (final position in positions) {
+      if (position.itemTrailingEdge <= 0) continue;
+      if (topVisible == null ||
+          position.itemLeadingEdge < topVisible.itemLeadingEdge) {
+        topVisible = position;
+      }
+    }
+    if (topVisible == null) return;
 
-    final topIndex = visible.first.index;
+    final topIndex = topVisible.index;
     final total = widget.readerState.paragraphs.length;
     if (total <= 1) return;
 
@@ -144,12 +152,14 @@ class _ReaderDragThumbState extends State<ReaderDragThumb> {
     for (int i = 0; i < total; i++) {
       final heading = paragraphs[i].heading;
       if (heading != null) {
-        marks.add(_HeadingMark(
-          title: heading.title,
-          level: heading.level,
-          ratio: i / (total - 1),
-          paraIndex: i,
-        ));
+        marks.add(
+          _HeadingMark(
+            title: heading.title,
+            level: heading.level,
+            ratio: i / (total - 1),
+            paraIndex: i,
+          ),
+        );
       }
     }
     _cachedMarks = marks;
@@ -178,8 +188,7 @@ class _ReaderDragThumbState extends State<ReaderDragThumb> {
     setState(() {
       _dragOffset = details.localPosition.dy - _thumbHeight / 2;
       // Immediately update tooltip based on position
-      final ratio =
-          (_dragOffset! / _availableDragHeight).clamp(0.0, 1.0);
+      final ratio = (_dragOffset! / _availableDragHeight).clamp(0.0, 1.0);
       final nearest = _findNearestHeading(ratio);
       _tooltipHeading = nearest?.title;
     });
@@ -227,8 +236,10 @@ class _ReaderDragThumbState extends State<ReaderDragThumb> {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        _availableDragHeight =
-            (constraints.maxHeight - _thumbHeight).clamp(0.0, double.infinity);
+        _availableDragHeight = (constraints.maxHeight - _thumbHeight).clamp(
+          0.0,
+          double.infinity,
+        );
 
         final total = widget.readerState.paragraphs.length;
         if (total <= 1) return const SizedBox.shrink();
@@ -256,95 +267,103 @@ class _ReaderDragThumbState extends State<ReaderDragThumb> {
             child: SizedBox(
               width: _totalTrackWidth,
               child: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                // ── Track background ─────────────────────────────────
-                Positioned(
-                  left: trackLeft,
-                  top: trackTop,
-                  bottom: trackBottom,
-                  width: _trackWidth,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: colors.surfaceContainerHighest
-                          .withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-
-                // ── Heading tick marks ───────────────────────────────
-                ...marks.map((mark) {
-                  final tickTop =
-                      mark.ratio * _availableDragHeight + _thumbHeight / 2;
-                  // Deeper heading levels get slightly shorter/dimmer ticks
-                  final opacity =
-                      (0.5 - (mark.level - 1) * 0.08).clamp(0.2, 0.5);
-                  final height = (4.0 - (mark.level - 1) * 0.4).clamp(2.0, 4.0);
-                  return Positioned(
-                    left: trackLeft - 1,
-                    top: tickTop - height / 2,
-                    width: _trackWidth + 2,
-                    height: height,
+                clipBehavior: Clip.none,
+                children: [
+                  // ── Track background ─────────────────────────────────
+                  Positioned(
+                    left: trackLeft,
+                    top: trackTop,
+                    bottom: trackBottom,
+                    width: _trackWidth,
                     child: Container(
                       decoration: BoxDecoration(
-                        color: colors.primary
-                            .withValues(alpha: opacity),
-                        borderRadius: BorderRadius.circular(1),
-                      ),
-                    ),
-                  );
-                }),
-
-                // ── Thumb ────────────────────────────────────────────
-                Positioned(
-                  top: thumbTop,
-                  left: 0,
-                  right: 0,
-                  height: _thumbHeight,
-                  child: Center(
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      width: _dragOffset != null ? _thumbWidth + 2 : _thumbWidth,
-                      height: _thumbHeight * 0.55,
-                      decoration: BoxDecoration(
-                        color: _dragOffset != null
-                            ? colors.primary.withValues(alpha: 0.7)
-                            : colors.primary.withValues(alpha: 0.35),
-                        borderRadius: BorderRadius.circular(9999),
-                        boxShadow: _dragOffset != null
-                            ? [
-                                BoxShadow(
-                                  color: colors.primary
-                                      .withValues(alpha: 0.3),
-                                  blurRadius: 4,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ]
-                            : null,
+                        color: colors.surfaceContainerHighest.withValues(
+                          alpha: 0.4,
+                        ),
+                        borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-                ),
 
-                // ── Tooltip (shown during drag, to the left of track) ─
-                if (_dragOffset != null && _tooltipHeading != null)
+                  // ── Heading tick marks ───────────────────────────────
+                  ...marks.map((mark) {
+                    final tickTop =
+                        mark.ratio * _availableDragHeight + _thumbHeight / 2;
+                    // Deeper heading levels get slightly shorter/dimmer ticks
+                    final opacity = (0.5 - (mark.level - 1) * 0.08).clamp(
+                      0.2,
+                      0.5,
+                    );
+                    final height = (4.0 - (mark.level - 1) * 0.4).clamp(
+                      2.0,
+                      4.0,
+                    );
+                    return Positioned(
+                      left: trackLeft - 1,
+                      top: tickTop - height / 2,
+                      width: _trackWidth + 2,
+                      height: height,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: colors.primary.withValues(alpha: opacity),
+                          borderRadius: BorderRadius.circular(1),
+                        ),
+                      ),
+                    );
+                  }),
+
+                  // ── Thumb ────────────────────────────────────────────
                   Positioned(
-                    top: (thumbTop + _thumbHeight / 2).clamp(
-                      0.0,
-                      constraints.maxHeight - 28,
-                    ),
-                    right: _totalTrackWidth + 4,
-                    child: _HeadingTooltip(
-                      title: _tooltipHeading!,
-                      isDark: isDark,
-                      colors: colors,
+                    top: thumbTop,
+                    left: 0,
+                    right: 0,
+                    height: _thumbHeight,
+                    child: Center(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        width: _dragOffset != null
+                            ? _thumbWidth + 2
+                            : _thumbWidth,
+                        height: _thumbHeight * 0.55,
+                        decoration: BoxDecoration(
+                          color: _dragOffset != null
+                              ? colors.primary.withValues(alpha: 0.7)
+                              : colors.primary.withValues(alpha: 0.35),
+                          borderRadius: BorderRadius.circular(9999),
+                          boxShadow: _dragOffset != null
+                              ? [
+                                  BoxShadow(
+                                    color: colors.primary.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                    blurRadius: 4,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ]
+                              : null,
+                        ),
+                      ),
                     ),
                   ),
-              ],
+
+                  // ── Tooltip (shown during drag, to the left of track) ─
+                  if (_dragOffset != null && _tooltipHeading != null)
+                    Positioned(
+                      top: (thumbTop + _thumbHeight / 2).clamp(
+                        0.0,
+                        constraints.maxHeight - 28,
+                      ),
+                      right: _totalTrackWidth + 4,
+                      child: _HeadingTooltip(
+                        title: _tooltipHeading!,
+                        isDark: isDark,
+                        colors: colors,
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
-        ),
         );
       },
     );
@@ -368,9 +387,7 @@ class _HeadingTooltip extends StatelessWidget {
     return Material(
       elevation: 4,
       borderRadius: BorderRadius.circular(8),
-      color: isDark
-          ? colors.surfaceContainerHigh
-          : colors.surfaceContainerLow,
+      color: isDark ? colors.surfaceContainerHigh : colors.surfaceContainerLow,
       surfaceTintColor: colors.primary,
       child: Container(
         constraints: BoxConstraints(maxWidth: 220),

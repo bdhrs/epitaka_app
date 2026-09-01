@@ -4,7 +4,7 @@
 /// text search, dictionary, AI tools). A plain `NativeDatabase(file)` runs
 /// every query on the main isolate, so slow queries — full-canon LIKE scans,
 /// FTS/BM25 matches, index builds — freeze the UI thread and Android shows
-/// the "App isn't responding" dialog (the Vimaṃsa / Gavesana AI tool searches
+/// the "App isn't responding" dialog (the Vīmaṃsā / Gavesana AI tool searches
 /// used to trigger this).
 ///
 /// On mobile (Android / iOS) this opens the database in a **background isolate**
@@ -39,9 +39,5 @@ QueryExecutor openDriftExecutor(
     );
   }
 
-  return NativeDatabase(
-    file,
-    setup: setup,
-    logStatements: logStatements,
-  );
+  return NativeDatabase(file, setup: setup, logStatements: logStatements);
 }
