@@ -1,4 +1,4 @@
-/// Vimaṃsa (विमंसा) — Investigation & Exploration screen.
+/// Vīmaṃsā (विमंसा) — Investigation & Exploration screen.
 ///
 /// A tool-based AI research assistant for the Tipitaka with persistent
 /// chat threads, conversation history, per-thread message limits, and
@@ -12,7 +12,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/app_localizations.dart';
-import '../../../core/utils/responsive_breakpoint.dart';
 import '../../../core/utils/velthuis.dart';
 import '../../gavesana/screens/gavesana_drawer.dart';
 import '../models/ai_qa_models.dart';
@@ -28,7 +27,7 @@ import '../widgets/attachment_bar.dart';
 import '../widgets/mention_index_build_dialog.dart';
 import '../widgets/mention_overlay.dart';
 
-const _featureName = 'Vimaṃsa';
+const _featureName = 'Vīmaṃsā';
 
 class VimamsaScreen extends ConsumerStatefulWidget {
   final String? initialThreadId;
@@ -112,21 +111,21 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     if (_isConverting) return;
 
     // Apply Velthuis conversion on-the-fly so users can type Velthuis
-    // notation (dhamma.m → dhammaṃ) or any Pāli script — same behavior
-    // as the search boxes. The converted text is what the mention search
-    // (and, later, the AI prompt) sees.
+    // notation (dhamma.m → dhammaṃ). For non-Roman scripts (Sinhala,
+    // Thai, Myanmar, …) leave the controller untouched so the user
+    // keeps seeing their native script; the mention search still receives
+    // the Roman-converted result below.
     final raw = _textController.text;
     final converted = velthuis(raw);
-    if (converted != raw) {
+    if (isRomanScript(raw) && converted != raw) {
       _isConverting = true;
       _textController.value = convertedTextEditingValue(_textController.value);
       _isConverting = false;
     }
 
-    // Read the post-conversion text. The field now keeps whatever script the
-    // user typed (only the Velthuis diacritics are applied on screen), so
-    // convert to Roman here — the mention index is stored in IAST — before
-    // the mention search sees it.
+    // Read the post-conversion text. For non-Roman scripts the field still
+    // shows the original script, so convert to Roman here — the mention
+    // index is stored in IAST — before the mention search sees it.
     final text = velthuis(_textController.text);
     ref.read(mentionSearchProvider.notifier).onTextChanged(text);
 
@@ -157,12 +156,12 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     try {
       if (!mounted) return;
       final count = await showMentionIndexBuildDialog(context);
-      debugPrint('[VIMAṂSA] Mention index built: $count entries');
+      debugPrint('[Vīmaṃsā] Mention index built: $count entries');
       // Invalidate the cached FutureProvider so the banner re-checks.
       ref.invalidate(isMentionIndexReadyProvider);
       await _checkMentionIndex();
     } catch (e) {
-      debugPrint('[VIMAṂSA] Failed to build mention index: $e');
+      debugPrint('[Vīmaṃsā] Failed to build mention index: $e');
     } finally {
       if (mounted) {
         setState(() => _mentionIndexBuilding = false);
@@ -263,6 +262,48 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     );
   }
 
+  void _confirmDeleteThread() {
+    final currentThreadId = ref.read(currentThreadIdProvider);
+    final loc = AppLocalizations.of(context);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(loc.deleteConversation),
+        content: Text(loc.deleteThreadConfirm(loc.chatHistory)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text(loc.cancel),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              if (currentThreadId != null) {
+                ref.read(chatHistoryNotifierProvider).deleteThread(currentThreadId);
+                ref.read(aiQaProvider.notifier).clearChat();
+              }
+            },
+            child: Text(loc.delete, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showInThreadSearch() {
+    final colors = Theme.of(context).colorScheme;
+    final messages = ref.read(aiQaProvider).messages;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _InThreadSearchSheet(
+        messages: messages,
+        colors: colors,
+      ),
+    );
+  }
+
   void _startNewChat() async {
     await ref.read(aiQaProvider.notifier).startNewThread();
     _focusNode.requestFocus();
@@ -314,6 +355,15 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     final currentThreadId = ref.watch(currentThreadIdProvider);
     final colors = Theme.of(context).colorScheme;
     final attachments = ref.watch(attachmentsProvider);
+
+    // Watch current thread for pinned state
+    final isPinned = currentThreadId != null
+        ? ref.watch(chatThreadProvider(currentThreadId)).when(
+            data: (t) => t?.isPinned ?? false,
+            loading: () => false,
+            error: (_, __) => false,
+          )
+        : false;
 
     ref.listen(aiQaProvider, (prev, next) {
       // A streamed response just finished rendering — jump to the START of
@@ -377,97 +427,238 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
           tooltip: AppLocalizations.of(context).navigationMenu,
           onPressed: () => _scaffoldKey.currentState?.openDrawer(),
         ),
-        title: Row(
-          children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    colors.primary,
-                    colors.primary.withValues(alpha: 0.7),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(
-                Icons.auto_awesome,
-                size: 18,
-                color: Colors.white,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    _featureName,
-                    style: AppTypography.headlineLarge.copyWith(
-                      color: colors.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 20,
-                    ),
-                  ),
-                  Text(
-                    currentThreadTitle.isNotEmpty
-                        ? currentThreadTitle
-                        : AppLocalizations.of(context).investigationExploration,
-                    style: AppTypography.labelSmall.copyWith(
-                      color: colors.onSurfaceVariant,
-                      fontSize: 10,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          // History button
-          IconButton(
-            icon: Icon(Icons.history, size: 20, color: colors.onSurfaceVariant),
-            tooltip: AppLocalizations.of(context).chatHistory,
-            onPressed: _showHistorySheet,
+        title: Text(
+          _featureName,
+          style: AppTypography.headlineLarge.copyWith(
+            color: colors.onSurface,
+            fontWeight: FontWeight.w600,
+            fontSize: 20,
           ),
+        ),
+        centerTitle: false,
+        actions: [
           // New chat button
           IconButton(
             icon: Icon(
-              Icons.add_comment_outlined,
-              size: 20,
+              Icons.add,
+              size: 22,
               color: colors.onSurfaceVariant,
             ),
             tooltip: AppLocalizations.of(context).newChat,
             onPressed: _startNewChat,
           ),
-          if (messages.isNotEmpty)
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline,
-                size: 20,
-                color: colors.onSurfaceVariant,
-              ),
-              tooltip: AppLocalizations.of(context).clearChat,
-              onPressed: () {
-                ref.read(aiQaProvider.notifier).clearChat();
-              },
-            ),
-          IconButton(
+          // Overflow menu: history, settings, clear
+          PopupMenuButton<String>
+            (
             icon: Icon(
-              Icons.tune,
-              color: settings.isValid ? colors.onSurfaceVariant : Colors.orange,
+              Icons.more_vert,
               size: 20,
+              color: colors.onSurfaceVariant,
             ),
-            tooltip: AppLocalizations.of(context).vimamsaSettings,
-            onPressed: () => showAiQaSettingsSheet(context),
+            onSelected: (value) {
+              switch (value) {
+                case 'history':
+                  _showHistorySheet();
+                  break;
+                case 'pin':
+                  if (currentThreadId != null) {
+                    ref.read(chatHistoryNotifierProvider).toggleThreadPinned(currentThreadId);
+                  }
+                  break;
+                case 'search':
+                  _showInThreadSearch();
+                  break;
+                case 'settings':
+                  showAiQaSettingsSheet(context);
+                  break;
+                case 'delete':
+                  _confirmDeleteThread();
+                  break;
+                case 'clear':
+                  ref.read(aiQaProvider.notifier).clearChat();
+                  break;
+              }
+            },
+            itemBuilder: (ctx) {
+              final loc = AppLocalizations.of(context);
+              final fs = settings.chatFontSize;
+              final fsLabel = '${(fs * 100).round()}%';
+              return [
+                PopupMenuItem(
+                  value: 'history',
+                  child: Row(
+                    children: [
+                      Icon(Icons.history, size: 18, color: colors.onSurfaceVariant),
+                      const SizedBox(width: 10),
+                      Text(loc.chatHistory),
+                    ],
+                  ),
+                ),
+                if (currentThreadId != null)
+                  PopupMenuItem(
+                    value: 'pin',
+                    child: Row(
+                      children: [
+                        Icon(
+                          isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                          size: 18,
+                          color: isPinned ? colors.primary : colors.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
+                        Text(isPinned ? loc.unpinThread : loc.pinThread),
+                      ],
+                    ),
+                  ),
+                if (messages.isNotEmpty)
+                  PopupMenuItem(
+                    value: 'search',
+                    child: Row(
+                      children: [
+                        Icon(Icons.search, size: 18, color: colors.onSurfaceVariant),
+                        const SizedBox(width: 10),
+                        Text(loc.searchInThread),
+                      ],
+                    ),
+                  ),
+                // ── Font size inline control ──
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  enabled: false,
+                  child: Row(
+                    children: [
+                      Icon(Icons.text_fields, size: 18, color: colors.onSurfaceVariant),
+                      const SizedBox(width: 10),
+                      Text(loc.fontSize, style: TextStyle(color: colors.onSurfaceVariant)),
+                      const Spacer(),
+                      // Decrease button
+                      GestureDetector(
+                        onTap: fs > 0.7
+                            ? () {
+                                ref.read(aiQaSettingsProvider.notifier)
+                                    .setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
+                              }
+                            : null,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: fs > 0.7
+                                ? colors.surfaceContainerHighest
+                                : colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            Icons.remove,
+                            size: 16,
+                            color: fs > 0.7 ? colors.onSurface : colors.onSurface.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        fsLabel,
+                        style: AppTypography.labelMedium.copyWith(
+                          color: colors.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // Increase button
+                      GestureDetector(
+                        onTap: fs < 2.0
+                            ? () {
+                                ref.read(aiQaSettingsProvider.notifier)
+                                    .setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
+                              }
+                            : null,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: fs < 2.0
+                                ? colors.surfaceContainerHighest
+                                : colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Icon(
+                            Icons.add,
+                            size: 16,
+                            color: fs < 2.0 ? colors.onSurface : colors.onSurface.withValues(alpha: 0.3),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                // ── Settings & actions ──
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'settings',
+                  child: Row(
+                    children: [
+                      Icon(Icons.tune, size: 18, color: settings.isValid ? colors.onSurfaceVariant : Colors.orange),
+                      const SizedBox(width: 10),
+                      Text(loc.vimamsaSettings),
+                    ],
+                  ),
+                ),
+                if (messages.isNotEmpty || currentThreadId != null) ...[
+                  const PopupMenuDivider(),
+                  PopupMenuItem(
+                    value: 'clear',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 18, color: colors.error),
+                        const SizedBox(width: 10),
+                        Text(
+                          loc.clearChat,
+                          style: TextStyle(color: colors.error),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ];
+            },
           ),
         ],
       ),
-      body: body,
+      body: CallbackShortcuts(
+        bindings: <ShortcutActivator, VoidCallback>{
+          // Cmd/Ctrl + N: New chat
+          const SingleActivator(LogicalKeyboardKey.keyN, control: true): _startNewChat,
+          const SingleActivator(LogicalKeyboardKey.keyN, meta: true): _startNewChat,
+          // Cmd/Ctrl + F: Search in thread
+          const SingleActivator(LogicalKeyboardKey.keyF, control: true): _showInThreadSearch,
+          const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _showInThreadSearch,
+          // Cmd/Ctrl + +: Increase font size
+          const SingleActivator(LogicalKeyboardKey.equal, control: true): () {
+            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
+          },
+          const SingleActivator(LogicalKeyboardKey.equal, meta: true): () {
+            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
+          },
+          // Cmd/Ctrl + -: Decrease font size
+          const SingleActivator(LogicalKeyboardKey.minus, control: true): () {
+            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
+          },
+          const SingleActivator(LogicalKeyboardKey.minus, meta: true): () {
+            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
+          },
+          // Cmd/Ctrl + 0: Reset font size
+          const SingleActivator(LogicalKeyboardKey.digit0, control: true): () {
+            ref.read(aiQaSettingsProvider.notifier).setChatFontSize(1.0);
+          },
+          const SingleActivator(LogicalKeyboardKey.digit0, meta: true): () {
+            ref.read(aiQaSettingsProvider.notifier).setChatFontSize(1.0);
+          },
+        },
+        child: body,
+      ),
     );
   } // ── Build helpers ─────────────────────────────────────────────────────
 
@@ -482,7 +673,11 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     required String? currentThreadId,
     required List<HeadingAttachment> attachments,
   }) {
-    return Stack(
+    return MediaQuery(
+      data: MediaQuery.of(context).copyWith(
+        textScaler: TextScaler.linear(settings.chatFontSize),
+      ),
+      child: Stack(
       children: [
         // Main content column (messages + attachment bar + input)
         Column(
@@ -498,6 +693,19 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                       scrollController: _scrollController,
                       messages: messages,
                       latestResponseKey: _latestResponseKey,
+                      onEditMessage: (text) {
+                        _textController.text = text;
+                        _focusNode.requestFocus();
+                      },
+                      onRetryMessage: () {
+                        // Re-send the last user message
+                        final lastUserMsg = messages
+                            .where((m) => m.isUser)
+                            .lastOrNull;
+                        if (lastUserMsg != null) {
+                          ref.read(aiQaProvider.notifier).sendMessage(lastUserMsg.text);
+                        }
+                      },
                     ),
             ),
 
@@ -513,6 +721,7 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
               textController: _textController,
               focusNode: _focusNode,
               onSend: _sendMessage,
+              onStop: () => ref.read(aiQaProvider.notifier).stopGeneration(),
               layerLink: _mentionLayerLink,
               onKeyEvent: _handleKeyEvent,
             ),
@@ -529,6 +738,7 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
             child: const MentionOverlay(),
           ),
       ],
+    ),
     );
   }
 
@@ -545,58 +755,18 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
       color: colors.surface,
       child: Row(
         children: [
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [colors.primary, colors.primary.withValues(alpha: 0.7)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(7),
-            ),
-            child: const Icon(
-              Icons.auto_awesome,
-              size: 15,
-              color: Colors.white,
-            ),
-          ),
-          const SizedBox(width: 8),
           Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _featureName,
-                  style: AppTypography.labelMedium.copyWith(
-                    color: colors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  currentThreadTitle.isNotEmpty
-                      ? currentThreadTitle
-                      : AppLocalizations.of(context).investigationExploration,
-                  style: AppTypography.labelSmall.copyWith(
-                    color: colors.onSurfaceVariant,
-                    fontSize: 10,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
+            child: Text(
+              _featureName,
+              style: AppTypography.labelMedium.copyWith(
+                color: colors.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
             ),
-          ),
-          IconButton(
-            icon: Icon(Icons.history, size: 18, color: colors.onSurfaceVariant),
-            tooltip: AppLocalizations.of(context).chatHistory,
-            visualDensity: VisualDensity.compact,
-            onPressed: _showHistorySheet,
           ),
           IconButton(
             icon: Icon(
-              Icons.add_comment_outlined,
+              Icons.add,
               size: 18,
               color: colors.onSurfaceVariant,
             ),
@@ -604,28 +774,63 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
             visualDensity: VisualDensity.compact,
             onPressed: _startNewChat,
           ),
-          if (messages.isNotEmpty)
-            IconButton(
-              icon: Icon(
-                Icons.delete_outline,
-                size: 18,
-                color: colors.onSurfaceVariant,
-              ),
-              tooltip: AppLocalizations.of(context).clearChat,
-              visualDensity: VisualDensity.compact,
-              onPressed: () {
-                ref.read(aiQaProvider.notifier).clearChat();
-              },
-            ),
-          IconButton(
+          PopupMenuButton<String>(
             icon: Icon(
-              Icons.tune,
-              color: settings.isValid ? colors.onSurfaceVariant : Colors.orange,
+              Icons.more_vert,
               size: 18,
+              color: colors.onSurfaceVariant,
             ),
-            tooltip: AppLocalizations.of(context).vimamsaSettings,
-            visualDensity: VisualDensity.compact,
-            onPressed: () => showAiQaSettingsSheet(context),
+            onSelected: (value) {
+              switch (value) {
+                case 'history':
+                  _showHistorySheet();
+                  break;
+                case 'settings':
+                  showAiQaSettingsSheet(context);
+                  break;
+                case 'clear':
+                  ref.read(aiQaProvider.notifier).clearChat();
+                  break;
+              }
+            },
+            itemBuilder: (ctx) => [
+              PopupMenuItem(
+                value: 'history',
+                child: Row(
+                  children: [
+                    Icon(Icons.history, size: 16, color: colors.onSurfaceVariant),
+                    const SizedBox(width: 8),
+                    Text(AppLocalizations.of(context).chatHistory),
+                  ],
+                ),
+              ),
+              PopupMenuItem(
+                value: 'settings',
+                child: Row(
+                  children: [
+                    Icon(Icons.tune, size: 16, color: settings.isValid ? colors.onSurfaceVariant : Colors.orange),
+                    const SizedBox(width: 8),
+                    Text(AppLocalizations.of(context).vimamsaSettings),
+                  ],
+                ),
+              ),
+              if (messages.isNotEmpty) ...[
+                const PopupMenuDivider(),
+                PopupMenuItem(
+                  value: 'clear',
+                  child: Row(
+                    children: [
+                      Icon(Icons.delete_outline, size: 16, color: colors.error),
+                      const SizedBox(width: 8),
+                      Text(
+                        AppLocalizations.of(context).clearChat,
+                        style: TextStyle(color: colors.error),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ],
           ),
         ],
       ),
@@ -784,160 +989,57 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     AiQaSettings settings,
     ColorScheme colors,
   ) {
-    return SingleChildScrollView(
-      physics: const AlwaysScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
-      child: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colors.primary.withValues(alpha: 0.15),
-                      colors.primary.withValues(alpha: 0.05),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(36),
-                ),
-                child: Icon(
-                  Icons.auto_awesome,
-                  size: 32,
-                  color: colors.primary.withValues(alpha: 0.7),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Vīmaṃsāya puccha',
-                style: AppTypography.headlineSmall.copyWith(
-                  color: colors.onSurface,
-                  fontWeight: FontWeight.w600,
-                  fontStyle: FontStyle.italic,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                AppLocalizations.of(context).askAboutTipitakaShort,
-                style: AppTypography.bodyTranslation.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                AppLocalizations.of(context).vimamsaIntro,
-                textAlign: TextAlign.center,
-                style: AppTypography.bodyTranslation.copyWith(
-                  color: colors.onSurfaceVariant,
-                  height: 1.5,
-                  fontSize: 13,
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              const SizedBox(height: 8),
-              _buildExamplePrompt(
-                colors,
-                'What are the commentaries on the Satipaṭṭhāna Sutta?',
-              ),
-              const SizedBox(height: 8),
-              _buildExamplePrompt(
-                colors,
-                'Compare the treatment of mettā in different nikāyas',
-              ),
-
-              const SizedBox(height: 24),
-              if (!settings.isValid) ...[
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        Icons.warning_amber,
-                        size: 16,
-                        color: Colors.orange[700],
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        AppLocalizations.of(context).apiKeyRequired,
-                        style: AppTypography.labelMedium.copyWith(
-                          color: Colors.orange[700],
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                FilledButton.tonalIcon(
-                  onPressed: () => showAiQaSettingsSheet(context),
-                  icon: const Icon(Icons.tune, size: 18),
-                  label: Text(AppLocalizations.of(context).configureApiKey),
-                ),
-              ],
-              if (settings.isValid && !isLoading)
-                FilledButton.tonalIcon(
-                  onPressed: () => _focusNode.requestFocus(),
-                  icon: const Icon(Icons.chat, size: 18),
-                  label: Text(AppLocalizations.of(context).startAsking),
-                ),
-
-              // History quick access
-              const SizedBox(height: 32),
-              TextButton.icon(
-                onPressed: _showHistorySheet,
-                icon: Icon(Icons.history, size: 16, color: colors.primary),
-                label: Text(
-                  AppLocalizations.of(context).viewPastConversations,
-                  style: AppTypography.labelSmall.copyWith(
-                    color: colors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildExamplePrompt(ColorScheme colors, String prompt) {
-    return InkWell(
-      onTap: () {
-        _textController.text = prompt;
-        _sendMessage();
-      },
-      borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-        decoration: BoxDecoration(
-          color: colors.surfaceContainerHighest.withValues(alpha: 0.3),
-          borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-          border: Border.all(
-            color: colors.outlineVariant.withValues(alpha: 0.5),
-          ),
-        ),
-        child: Row(
+    return Center(
+      child: SingleChildScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.arrow_right, size: 18, color: colors.primary),
-            const SizedBox(width: 6),
-            Expanded(
-              child: Text(
-                prompt,
-                style: AppTypography.labelSmall.copyWith(
-                  color: colors.onSurfaceVariant,
-                  fontSize: 12,
+            // Logo
+            Container(
+              width: 56,
+              height: 56,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    colors.primary,
+                    colors.primary.withValues(alpha: 0.7),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
                 ),
+                borderRadius: BorderRadius.circular(16),
               ),
+              child: const Icon(
+                Icons.auto_awesome,
+                size: 28,
+                color: Colors.white,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              _featureName,
+              style: AppTypography.headlineLarge.copyWith(
+                color: colors.onSurface,
+                fontWeight: FontWeight.w600,
+                fontSize: 22,
+              ),
+            ),
+            const SizedBox(height: 8),
+            if (!settings.isValid)
+              FilledButton.tonalIcon(
+                onPressed: () => showAiQaSettingsSheet(context),
+                icon: const Icon(Icons.tune, size: 18),
+                label: Text(AppLocalizations.of(context).configureApiKey),
+              ),
+
+            const SizedBox(height: 24),
+            // History button
+            OutlinedButton.icon(
+              onPressed: _showHistorySheet,
+              icon: const Icon(Icons.history, size: 18),
+              label: Text(AppLocalizations.of(context).chatHistory),
             ),
           ],
         ),
@@ -947,23 +1049,240 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+//  IN-THREAD SEARCH SHEET
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _InThreadSearchSheet extends StatefulWidget {
+  final List<AiQaMessage> messages;
+  final ColorScheme colors;
+
+  const _InThreadSearchSheet({required this.messages, required this.colors});
+
+  @override
+  State<_InThreadSearchSheet> createState() => _InThreadSearchSheetState();
+}
+
+class _InThreadSearchSheetState extends State<_InThreadSearchSheet> {
+  final _searchController = TextEditingController();
+  List<AiQaMessage> _results = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _results = widget.messages;
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearch(String query) {
+    if (query.trim().isEmpty) {
+      setState(() => _results = widget.messages);
+      return;
+    }
+    final q = query.toLowerCase();
+    setState(() {
+      _results = widget.messages
+          .where((m) => m.text.toLowerCase().contains(q))
+          .toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.7,
+      decoration: BoxDecoration(
+        color: widget.colors.surface,
+        borderRadius: const BorderRadius.vertical(
+          top: Radius.circular(AppDimensions.radiusSheet),
+        ),
+      ),
+      child: Column(
+        children: [
+          // Drag handle
+          Padding(
+            padding: const EdgeInsets.only(top: 12, bottom: 8),
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: widget.colors.outlineVariant,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          // Search field
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppDimensions.md,
+              vertical: 4,
+            ),
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              onChanged: _onSearch,
+              decoration: InputDecoration(
+                hintText: AppLocalizations.of(context).searchInThread,
+                prefixIcon: const Icon(Icons.search, size: 18),
+                filled: true,
+                fillColor: widget.colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
+                isDense: true,
+              ),
+            ),
+          ),
+          const Divider(height: 1),
+          // Results
+          Expanded(
+            child: _results.isEmpty
+                ? Center(
+                    child: Text(
+                      AppLocalizations.of(context).noResultsFound,
+                      style: AppTypography.labelMedium.copyWith(
+                        color: widget.colors.onSurfaceVariant,
+                      ),
+                    ),
+                  )
+                : ListView.builder(
+                    itemCount: _results.length,
+                    itemBuilder: (ctx, i) {
+                      final msg = _results[i];
+                      final q = _searchController.text.toLowerCase();
+                      final preview = _highlightMatch(msg.text, q);
+                      return ListTile(
+                        leading: Icon(
+                          msg.isUser ? Icons.person : Icons.smart_toy,
+                          size: 16,
+                          color: widget.colors.onSurfaceVariant,
+                        ),
+                        title: preview,
+                        subtitle: Text(
+                          msg.isUser ? 'User' : 'Assistant',
+                          style: AppTypography.labelSmall.copyWith(
+                            fontSize: 10,
+                            color: widget.colors.onSurfaceVariant.withValues(alpha: 0.5),
+                          ),
+                        ),
+                        onTap: () => Navigator.of(context).pop(),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _highlightMatch(String text, String query) {
+    if (query.isEmpty) {
+      return Text(
+        text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: AppTypography.labelSmall.copyWith(
+          color: widget.colors.onSurface,
+        ),
+      );
+    }
+    final lower = text.toLowerCase();
+    final idx = lower.indexOf(query);
+    if (idx < 0) {
+      return Text(
+        text,
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: AppTypography.labelSmall.copyWith(
+          color: widget.colors.onSurface,
+        ),
+      );
+    }
+    final start = (idx - 20).clamp(0, text.length);
+    final end = (idx + query.length + 40).clamp(0, text.length);
+    var display = text.substring(start, end);
+    if (start > 0) display = '…$display';
+    if (end < text.length) display = '$display…';
+    return Text.rich(
+      TextSpan(
+        children: _buildHighlightedSpans(display, query),
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
+    );
+  }
+
+  List<TextSpan> _buildHighlightedSpans(String text, String query) {
+    final spans = <TextSpan>[];
+    final lower = text.toLowerCase();
+    int lastEnd = 0;
+    for (final match in query.allMatches(lower)) {
+      if (match.start > lastEnd) {
+        spans.add(TextSpan(
+          text: text.substring(lastEnd, match.start),
+          style: AppTypography.labelSmall.copyWith(
+            color: widget.colors.onSurface,
+          ),
+        ));
+      }
+      spans.add(TextSpan(
+        text: text.substring(match.start, match.end),
+        style: AppTypography.labelSmall.copyWith(
+          color: widget.colors.onSurface,
+          backgroundColor: widget.colors.primary.withValues(alpha: 0.2),
+          fontWeight: FontWeight.w600,
+        ),
+      ));
+      lastEnd = match.end;
+    }
+    if (lastEnd < text.length) {
+      spans.add(TextSpan(
+        text: text.substring(lastEnd),
+        style: AppTypography.labelSmall.copyWith(
+          color: widget.colors.onSurface,
+        ),
+      ));
+    }
+    return spans;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 //  THREAD HISTORY BOTTOM SHEET
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _ThreadHistorySheet extends ConsumerWidget {
+class _ThreadHistorySheet extends ConsumerStatefulWidget {
   const _ThreadHistorySheet();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_ThreadHistorySheet> createState() => _ThreadHistorySheetState();
+}
+
+class _ThreadHistorySheetState extends ConsumerState<_ThreadHistorySheet> {
+  final _searchController = TextEditingController();
+  String _searchQuery = '';
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final threadsAsync = ref.watch(chatThreadsProvider);
 
     return DraggableScrollableSheet(
-      // Don't fill the whole screen (see dictionary_sheet.dart): with the
-      // default `expand: true` the sheet's scrollable covers the full
-      // screen and swallows taps above the sheet, so tapping outside can
-      // no longer dismiss the modal. `expand: false` keeps the top space
-      // as the dismissible modal barrier.
       expand: false,
       initialChildSize: 0.6,
       minChildSize: 0.3,
@@ -1032,56 +1351,65 @@ class _ThreadHistorySheet extends ConsumerWidget {
                 ),
               ),
 
+              // Search field
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.md,
+                  vertical: 4,
+                ),
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (v) => setState(() => _searchQuery = v),
+                  decoration: InputDecoration(
+                    hintText: AppLocalizations.of(context).searchHistory,
+                    prefixIcon: const Icon(Icons.search, size: 18),
+                    filled: true,
+                    fillColor: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(24),
+                      borderSide: BorderSide.none,
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
+                    isDense: true,
+                  ),
+                ),
+              ),
+
               const Divider(height: 1),
 
               // Thread list
               Expanded(
                 child: threadsAsync.when(
                   data: (threads) {
-                    if (threads.isEmpty) {
+                    // Filter threads by search query
+                    final filtered = _searchQuery.trim().isEmpty
+                        ? threads
+                        : threads
+                            .where((t) => t.title
+                                .toLowerCase()
+                                .contains(_searchQuery.toLowerCase()))
+                            .toList();
+                    if (filtered.isEmpty) {
                       return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(32),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                Icons.chat_bubble_outline,
-                                size: 48,
-                                color: colors.onSurfaceVariant.withValues(
-                                  alpha: 0.3,
-                                ),
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                AppLocalizations.of(context).noConversationsYet,
-                                style: AppTypography.labelMedium.copyWith(
-                                  color: colors.onSurfaceVariant,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                AppLocalizations.of(
-                                  context,
-                                ).startNewChatToBegin,
-                                style: AppTypography.labelSmall.copyWith(
-                                  color: colors.onSurfaceVariant.withValues(
-                                    alpha: 0.6,
-                                  ),
-                                ),
-                              ),
-                            ],
+                        child: Text(
+                          _searchQuery.trim().isEmpty
+                              ? AppLocalizations.of(context).noConversationsYet
+                              : AppLocalizations.of(context).noResultsFound,
+                          style: AppTypography.labelMedium.copyWith(
+                            color: colors.onSurfaceVariant,
                           ),
                         ),
                       );
                     }
-
                     return ListView.builder(
                       controller: scrollController,
                       padding: const EdgeInsets.symmetric(vertical: 4),
-                      itemCount: threads.length,
+                      itemCount: filtered.length,
                       itemBuilder: (context, index) {
-                        final thread = threads[index];
+                        final thread = filtered[index];
                         return _ThreadHistoryTile(thread: thread);
                       },
                     );
@@ -1128,19 +1456,31 @@ class _ThreadHistoryTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
-          isActive ? Icons.chat : Icons.chat_bubble_outline,
+          isActive ? Icons.chat : (thread.isPinned ? Icons.push_pin : Icons.chat_bubble_outline),
           size: 16,
-          color: isActive ? colors.primary : colors.onSurfaceVariant,
+          color: isActive ? colors.primary : (thread.isPinned ? colors.primary : colors.onSurfaceVariant),
         ),
       ),
-      title: Text(
-        thread.title,
-        style: AppTypography.labelMedium.copyWith(
-          color: colors.onSurface,
-          fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
-        ),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
+      title: Row(
+        children: [
+          Expanded(
+            child: Text(
+              thread.title,
+              style: AppTypography.labelMedium.copyWith(
+                color: colors.onSurface,
+                fontWeight: isActive ? FontWeight.w600 : FontWeight.w500,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          if (thread.isPinned)
+            Icon(
+              Icons.push_pin,
+              size: 12,
+              color: colors.primary.withValues(alpha: 0.6),
+            ),
+        ],
       ),
       subtitle: Row(
         children: [
@@ -1195,52 +1535,73 @@ class _ThreadHistoryTile extends ConsumerWidget {
                 color: colors.onSurfaceVariant,
               ),
               onSelected: (value) async {
-                if (value == 'delete') {
-                  final confirm = await showDialog<bool>(
-                    context: context,
-                    builder: (ctx) => AlertDialog(
-                      title: Text(
-                        AppLocalizations.of(context).deleteConversation,
-                      ),
-                      content: Text(
-                        AppLocalizations.of(
-                          context,
-                        ).deleteThreadConfirm(thread.title),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(false),
-                          child: Text(AppLocalizations.of(context).cancel),
+                switch (value) {
+                  case 'pin':
+                    ref.read(chatHistoryNotifierProvider).toggleThreadPinned(thread.id);
+                    break;
+                  case 'delete':
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (ctx) => AlertDialog(
+                        title: Text(
+                          AppLocalizations.of(context).deleteConversation,
                         ),
-                        TextButton(
-                          onPressed: () => Navigator.of(ctx).pop(true),
-                          child: Text(
-                            AppLocalizations.of(context).delete,
-                            style: TextStyle(color: colors.error),
+                        content: Text(
+                          AppLocalizations.of(
+                            context,
+                          ).deleteThreadConfirm(thread.title),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(false),
+                            child: Text(AppLocalizations.of(context).cancel),
                           ),
-                        ),
-                      ],
-                    ),
-                  );
-                  if (confirm == true) {
-                    ref
-                        .read(chatHistoryNotifierProvider)
-                        .deleteThread(thread.id);
-                  }
+                          TextButton(
+                            onPressed: () => Navigator.of(ctx).pop(true),
+                            child: Text(
+                              AppLocalizations.of(context).delete,
+                              style: TextStyle(color: colors.error),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm == true) {
+                      ref
+                          .read(chatHistoryNotifierProvider)
+                          .deleteThread(thread.id);
+                    }
+                    break;
                 }
               },
-              itemBuilder: (ctx) => [
-                PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      const Icon(Icons.delete_outline, size: 16),
-                      const SizedBox(width: 8),
-                      Text(AppLocalizations.of(context).delete),
-                    ],
+              itemBuilder: (ctx) {
+                final loc = AppLocalizations.of(context);
+                return [
+                  PopupMenuItem(
+                    value: 'pin',
+                    child: Row(
+                      children: [
+                        Icon(
+                          thread.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                          size: 16,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(thread.isPinned ? loc.unpinThread : loc.pinThread),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                  PopupMenuItem(
+                    value: 'delete',
+                    child: Row(
+                      children: [
+                        Icon(Icons.delete_outline, size: 16, color: colors.error),
+                        const SizedBox(width: 8),
+                        Text(loc.delete, style: TextStyle(color: colors.error)),
+                      ],
+                    ),
+                  ),
+                ];
+              },
             ),
       onTap: () {
         Navigator.of(context).pop();
@@ -1277,11 +1638,19 @@ class AiQaMessageListView extends ConsumerWidget {
   /// response's start into view once streaming finishes.
   final GlobalKey? latestResponseKey;
 
+  /// Callback when user taps "edit" on a user message.
+  final void Function(String text)? onEditMessage;
+
+  /// Callback when user taps "retry" on an assistant message.
+  final VoidCallback? onRetryMessage;
+
   const AiQaMessageListView({
     super.key,
     required this.scrollController,
     required this.messages,
     this.latestResponseKey,
+    this.onEditMessage,
+    this.onRetryMessage,
   });
 
   @override
@@ -1304,6 +1673,12 @@ class AiQaMessageListView extends ConsumerWidget {
         final bubble = AiQaMessageBubble(
           key: ValueKey(message.id),
           message: message,
+          onEdit: message.isUser && onEditMessage != null
+              ? () => onEditMessage!(message.text)
+              : null,
+          onRetry: !message.isUser && onRetryMessage != null
+              ? onRetryMessage
+              : null,
         );
         final child = index == latestResponseIndex && latestResponseKey != null
             ? KeyedSubtree(key: latestResponseKey, child: bubble)
@@ -1315,16 +1690,6 @@ class AiQaMessageListView extends ConsumerWidget {
       },
     );
 
-    // On desktop, center the chat in a narrower column for readability.
-    final isDesktop = ResponsiveBreakpoint.isDesktop(context);
-    if (isDesktop) {
-      return Center(
-        child: Container(
-          constraints: const BoxConstraints(maxWidth: 800),
-          child: listContent,
-        ),
-      );
-    }
     return listContent;
   }
 }
@@ -1423,6 +1788,7 @@ class _AiQaInputBar extends ConsumerWidget {
   final TextEditingController textController;
   final FocusNode focusNode;
   final VoidCallback onSend;
+  final VoidCallback? onStop;
   final LayerLink layerLink;
   final KeyEventHandler onKeyEvent;
 
@@ -1431,6 +1797,7 @@ class _AiQaInputBar extends ConsumerWidget {
     required this.textController,
     required this.focusNode,
     required this.onSend,
+    this.onStop,
     required this.layerLink,
     required this.onKeyEvent,
   });
@@ -1438,7 +1805,6 @@ class _AiQaInputBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
-    final mentionState = ref.watch(mentionSearchProvider);
     final currentThread = ref.watch(currentThreadIdProvider);
 
     // Check if the thread is full using when()
@@ -1468,20 +1834,6 @@ class _AiQaInputBar extends ConsumerWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          // Tip: @ to attach
-          if (!mentionState.isActive)
-            Tooltip(
-              message: AppLocalizations.of(context).typeAtToAttach,
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 10, right: 4),
-                child: Icon(
-                  Icons.bookmark_add_outlined,
-                  size: 18,
-                  color: colors.onSurfaceVariant.withValues(alpha: 0.4),
-                ),
-              ),
-            ),
-
           Expanded(
             child: CompositedTransformTarget(
               link: layerLink,
@@ -1500,7 +1852,7 @@ class _AiQaInputBar extends ConsumerWidget {
                   decoration: InputDecoration(
                     hintText: isThreadFull
                         ? AppLocalizations.of(context).threadIsFull
-                        : AppLocalizations.of(context).askTipitakaOrAttach,
+                        : AppLocalizations.of(context).typeAtToAttach,
                     hintStyle: TextStyle(
                       color: colors.onSurfaceVariant.withValues(alpha: 0.5),
                       fontSize: 15,
@@ -1525,37 +1877,118 @@ class _AiQaInputBar extends ConsumerWidget {
           const SizedBox(width: 8),
           Material(
             color: (isLoading || isThreadFull)
-                ? colors.onSurfaceVariant.withValues(alpha: 0.2)
+                ? colors.error.withValues(alpha: 0.1)
                 : colors.primary,
             borderRadius: BorderRadius.circular(24),
             child: InkWell(
               borderRadius: BorderRadius.circular(24),
-              onTap: (isLoading || isThreadFull) ? null : onSend,
-              child: Container(
-                width: 44,
-                height: 44,
-                alignment: Alignment.center,
-                child: isLoading
-                    ? SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: colors.onSurfaceVariant,
-                        ),
-                      )
-                    : Icon(
-                        isThreadFull ? Icons.lock : Icons.arrow_upward,
-                        color: isThreadFull
-                            ? colors.onSurfaceVariant.withValues(alpha: 0.4)
-                            : colors.surface,
-                        size: 20,
-                      ),
+              onTap: isLoading
+                  ? onStop
+                  : (isThreadFull ? null : onSend),
+              child: _StopOrSendButton(
+                isLoading: isLoading,
+                isThreadFull: isThreadFull,
+                colors: colors,
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+//  STOP / SEND ANIMATED BUTTON
+// ═══════════════════════════════════════════════════════════════════════════
+
+class _StopOrSendButton extends StatefulWidget {
+  final bool isLoading;
+  final bool isThreadFull;
+  final ColorScheme colors;
+
+  const _StopOrSendButton({
+    required this.isLoading,
+    required this.isThreadFull,
+    required this.colors,
+  });
+
+  @override
+  State<_StopOrSendButton> createState() => _StopOrSendButtonState();
+}
+
+class _StopOrSendButtonState extends State<_StopOrSendButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _glowController;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _glowController = AnimationController(
+      duration: const Duration(milliseconds: 1500),
+      vsync: this,
+    );
+    _glowAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _glowController, curve: Curves.easeInOut),
+    );
+    if (widget.isLoading) _glowController.repeat(reverse: true);
+  }
+
+  @override
+  void didUpdateWidget(_StopOrSendButton oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isLoading && !_glowController.isAnimating) {
+      _glowController.repeat(reverse: true);
+    } else if (!widget.isLoading && _glowController.isAnimating) {
+      _glowController.stop();
+      _glowController.value = 0;
+    }
+  }
+
+  @override
+  void dispose() {
+    _glowController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _glowAnimation,
+      builder: (context, child) {
+        final glowOpacity = widget.isLoading ? _glowAnimation.value * 0.6 : 0.0;
+        return Container(
+          width: 44,
+          height: 44,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: widget.isLoading
+                ? [
+                    BoxShadow(
+                      color: widget.colors.error.withValues(alpha: glowOpacity),
+                      blurRadius: 12 + glowOpacity * 8,
+                      spreadRadius: 2 + glowOpacity * 4,
+                    ),
+                  ]
+                : null,
+          ),
+          child: widget.isLoading
+              ? Icon(
+                  Icons.stop_rounded,
+                  color: widget.colors.error,
+                  size: 24,
+                )
+              : Icon(
+                  widget.isThreadFull ? Icons.lock : Icons.arrow_upward,
+                  color: widget.isThreadFull
+                      ? widget.colors.onSurfaceVariant.withValues(alpha: 0.4)
+                      : widget.colors.surface,
+                  size: 20,
+                ),
+        );
+      },
     );
   }
 }

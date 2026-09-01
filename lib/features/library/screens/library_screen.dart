@@ -188,6 +188,11 @@ class _LibraryAppBar extends StatelessWidget implements PreferredSizeWidget {
       centerTitle: true,
       actions: [
         IconButton(
+          icon: Icon(Icons.auto_awesome, color: colors.primary),
+          tooltip: AppLocalizations.of(context).vimamsa,
+          onPressed: () => context.push('/ai-qa'),
+        ),
+        IconButton(
           icon: const Icon(Icons.search),
           color: colors.onSurfaceVariant,
           onPressed: () => context.push('/search'),

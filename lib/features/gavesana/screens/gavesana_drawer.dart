@@ -52,44 +52,24 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
                 ),
               ),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: colors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(
-                        Icons.menu_book,
-                        size: 20,
-                        color: colors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Text(
-                      'ePitaka',
-                      style: AppTypography.headlineLarge.copyWith(
-                        color: colors.primary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 22,
-                      ),
-                    ),
-                  ],
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: Image.asset(
+                    'assets/icon.png',
+                    width: 48,
+                    height: 48,
+                    fit: BoxFit.cover,
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: const EdgeInsets.only(left: 46),
-                  child: Text(
-                    loc.paliTipitakaReader,
-                    style: AppTypography.labelSmall.copyWith(
-                      color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                      fontSize: 11,
-                    ),
+                const SizedBox(width: 14),
+                Text(
+                  'ePitaka',
+                  style: AppTypography.headlineLarge.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 26,
                   ),
                 ),
               ],
@@ -101,133 +81,13 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
             child: ListView(
               padding: const EdgeInsets.only(top: 8),
               children: [
-                // ── Tipitaka ─────────────────────────────────
+                // ── Group 1: Tipiṭaka + Vīmaṃsā ──────────────
                 _DrawerItem(
                   icon: Icons.menu_book,
                   title: loc.tipitaka,
                   onTap: () => _closeAndGo(context, '/'),
                   selected: _isRouteActive(context, '/'),
                 ),
-
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Search ───────────────────────────────────
-                _DrawerItem(
-                  icon: Icons.search,
-                  title: loc.search,
-                  onTap: () => _closeAndGo(context, '/search?fromDrawer=true'),
-                  selected: _isRouteActive(context, '/search'),
-                ),
-
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Annotations ──────────────────────────────
-                _DrawerItem(
-                  icon: Icons.edit_note,
-                  title: loc.annotations,
-                  subtitle: loc.highlightsNotesBookmarks,
-                  onTap: () =>
-                      _closeAndGo(context, '/annotations?fromDrawer=true'),
-                  selected: _isRouteActive(context, '/annotations'),
-                ),
-
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Script Converter ─────────────────────────
-                _DrawerItem(
-                  icon: Icons.swap_horiz,
-                  title: loc.scriptConverter,
-                  subtitle: loc.scriptConverterSubtitle,
-                  onTap: () =>
-                      _closeAndGo(context, '/script-converter?fromDrawer=true'),
-                  selected: _isRouteActive(context, '/script-converter'),
-                ),
-
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Dictionary ────────────────────────────────
-                _DrawerItem(
-                  icon: Icons.menu_book_outlined,
-                  title: loc.dictionary,
-                  onTap: () => _closeAndGo(context, '/dictionary'),
-                  selected: _isRouteActive(context, '/dictionary'),
-                ),
-
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Outline ──────────────────────────────────────
-                // The outline of the book currently open in the reader —
-                // every section with its study guide.
-                _DrawerItem(
-                  icon: Icons.account_tree_outlined,
-                  title: loc.outline,
-                  subtitle: loc.outlineSubtitle,
-                  onTap: _openOutline,
-                ),
-
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Gavesana ─────────────────────────────────
-                _DrawerItem(
-                  icon: Icons.psychology,
-                  title: loc.gavesana,
-                  subtitle: loc.semanticSearch,
-                  onTap: () => _closeAndGo(context, '/gavesana'),
-                  selected: _isRouteActive(context, '/gavesana'),
-                ),
-
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
-
-                // ── Vimaṃsa ───────────────────────────────────
                 _DrawerItem(
                   icon: Icons.auto_awesome,
                   title: loc.vimamsa,
@@ -236,16 +96,55 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
                   selected: _isRouteActive(context, '/ai-qa'),
                 ),
 
-                const SizedBox(height: 4),
-                Divider(
-                  height: 1,
-                  indent: 20,
-                  endIndent: 20,
-                  color: colors.outlineVariant.withValues(alpha: 0.3),
-                ),
-                const SizedBox(height: 4),
+                _DrawerDivider(colors: colors),
 
-                // ── Translation Builder ────────────────────────
+                // ── Group 2: Search + Gavesanā ────────────────
+                _DrawerItem(
+                  icon: Icons.search,
+                  title: loc.search,
+                  onTap: () => _closeAndGo(context, '/search?fromDrawer=true'),
+                  selected: _isRouteActive(context, '/search'),
+                ),
+                _DrawerItem(
+                  icon: Icons.psychology,
+                  title: loc.gavesana,
+                  subtitle: loc.semanticSearch,
+                  onTap: () => _closeAndGo(context, '/gavesana'),
+                  selected: _isRouteActive(context, '/gavesana'),
+                ),
+
+                _DrawerDivider(colors: colors),
+
+                // ── Group 3: Annotations + Outline ────────────
+                _DrawerItem(
+                  icon: Icons.edit_note,
+                  title: loc.annotations,
+                  onTap: () =>
+                      _closeAndGo(context, '/annotations?fromDrawer=true'),
+                  selected: _isRouteActive(context, '/annotations'),
+                ),
+                _DrawerItem(
+                  icon: Icons.account_tree_outlined,
+                  title: loc.outline,
+                  onTap: _openOutline,
+                ),
+
+                _DrawerDivider(colors: colors),
+
+                // ── Group 4: Dictionary + Script + Translator ─
+                _DrawerItem(
+                  icon: Icons.menu_book_outlined,
+                  title: loc.dictionary,
+                  onTap: () => _closeAndGo(context, '/dictionary'),
+                  selected: _isRouteActive(context, '/dictionary'),
+                ),
+                _DrawerItem(
+                  icon: Icons.swap_horiz,
+                  title: loc.scriptConverter,
+                  onTap: () =>
+                      _closeAndGo(context, '/script-converter?fromDrawer=true'),
+                  selected: _isRouteActive(context, '/script-converter'),
+                ),
                 _DrawerItem(
                   icon: Icons.translate,
                   title: loc.t('Translation Builder'),
@@ -272,15 +171,16 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
                 ),
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // Feedback
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop(); // close drawer
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _DrawerIconButton(
+                    icon: Icons.feedback_outlined,
+                    tooltip: loc.feedback,
+                    onTap: () {
+                      Navigator.of(context).pop();
                       launchUrl(
                         Uri(
                           scheme: 'mailto',
@@ -293,57 +193,19 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
                         mode: LaunchMode.externalApplication,
                       );
                     },
-                    icon: Icon(
-                      Icons.feedback_outlined,
-                      size: 16,
-                      color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                    ),
-                    label: Text(
-                      loc.feedback,
-                      style: AppTypography.labelSmall.copyWith(
-                        color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                      ),
-                    ),
                   ),
-                ),
-                // Feature Guide (reopen the new-user instructions anytime)
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton.icon(
-                    onPressed: () =>
-                        _closeAndGo(context, AppRoutes.featureGuide),
-                    icon: Icon(
-                      Icons.explore_outlined,
-                      size: 16,
-                      color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                    ),
-                    label: Text(
-                      loc.featureGuide,
-                      style: AppTypography.labelSmall.copyWith(
-                        color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                      ),
-                    ),
+                  _DrawerIconButton(
+                    icon: Icons.explore_outlined,
+                    tooltip: loc.featureGuide,
+                    onTap: () => _closeAndGo(context, AppRoutes.featureGuide),
                   ),
-                ),
-                // Settings
-                SizedBox(
-                  width: double.infinity,
-                  child: TextButton.icon(
-                    onPressed: () => _closeAndGo(context, '/settings'),
-                    icon: Icon(
-                      Icons.settings,
-                      size: 16,
-                      color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                    ),
-                    label: Text(
-                      loc.settings,
-                      style: AppTypography.labelSmall.copyWith(
-                        color: colors.onSurfaceVariant.withValues(alpha: 0.6),
-                      ),
-                    ),
+                  _DrawerIconButton(
+                    icon: Icons.settings_outlined,
+                    tooltip: loc.settings,
+                    onTap: () => _closeAndGo(context, '/settings'),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
@@ -353,7 +215,7 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
 
   void _closeAndGo(BuildContext context, String route) {
     Navigator.of(context).pop(); // close drawer
-    context.push(route);
+    context.go(route);
   }
 
   /// Open the outline of the book currently open in the reader. When no
@@ -385,6 +247,26 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
 }
 
 // ── Drawer Item ─────────────────────────────────────────────────────────
+
+// ── Drawer Divider (between groups) ────────────────────────────────
+
+class _DrawerDivider extends StatelessWidget {
+  final ColorScheme colors;
+
+  const _DrawerDivider({required this.colors});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+      child: Divider(
+        height: 1,
+        thickness: 1,
+        color: colors.outlineVariant.withValues(alpha: 0.3),
+      ),
+    );
+  }
+}
 
 class _DrawerItem extends StatelessWidget {
   final IconData icon;
@@ -463,6 +345,46 @@ class _DrawerItem extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Drawer Icon Button (footer row) ────────────────────────────────
+
+class _DrawerIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _DrawerIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: colors.onSurfaceVariant,
           ),
         ),
       ),
