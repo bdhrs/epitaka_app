@@ -5,6 +5,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
 import android.os.Build
+import android.util.Log
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.embedding.engine.FlutterEngineCache
@@ -160,18 +161,23 @@ class MainActivity : FlutterActivity() {
      */
     private fun copyCoreDatabases(destDir: File): List<String> {
         if (!destDir.exists()) destDir.mkdirs()
+        Log.i(TAG, "copyCoreDatabases → ${destDir.absolutePath}")
         val copied = mutableListOf<String>()
         for (name in CORE_DB_FILES) {
             val dest = File(destDir, name)
-            // Skip only when a real (non-empty) database is already present.
-            // A 0-byte file may have been written by the bundled-assets copy
-            // step (ensureBundledDatabases) before this runs — overwrite it
-            // with the real database so fresh installs don't end up empty.
-            if (dest.exists() && dest.length() > 0) continue
-            val input = openAsset(name) ?: continue // pack not available
+            if (dest.exists() && dest.length() > 0) {
+                Log.i(TAG, "$name already present (${dest.length()} bytes), skipping")
+                continue
+            }
+            val input = openAsset(name)
+            if (input == null) {
+                Log.w(TAG, "$name not in asset pack; will fall back to download")
+                continue
+            }
             input.use { ins ->
                 dest.outputStream().use { out -> ins.copyTo(out) }
             }
+            Log.i(TAG, "copied $name (${dest.length()} bytes)")
             copied.add(name)
         }
         return copied
@@ -179,23 +185,79 @@ class MainActivity : FlutterActivity() {
 
     /**
      * Opens a file from the install-time asset pack via the standard
-     * AssetManager. Depending on the bundletool version the file may be
-     * addressable by its bare name, or prefixed with the pack name — try the
-     * common layouts defensively.
+     * AssetManager.
+     *
+     * The addressable path varies with how the app was packaged: an AAB
+     * installed via Play exposes the pack content by bare name, while a
+     * sideloaded APK (`flutter build apk`) merges it under different
+     * prefixes. All known layouts are tried, then the asset tree is listed
+     * to discover the file wherever it actually landed.
      */
     private fun openAsset(name: String): InputStream? {
         val assetManager = assets
-        for (candidate in listOf(name, "core_db/$name", "assets/core_db/$name")) {
+        for (candidate in assetCandidates(name)) {
             try {
                 return assetManager.open(candidate)
             } catch (_: Exception) {
                 // try next candidate
             }
         }
+        val found = findAssetByName(name)
+        if (found != null) {
+            try {
+                return assetManager.open(found)
+            } catch (e: Exception) {
+                Log.w(TAG, "openAsset: discovered $found but open failed: $e")
+            }
+        }
+        Log.w(TAG, "openAsset: $name not found. roots=${listAssetDir("")}")
+        return null
+    }
+
+    private fun assetCandidates(name: String): List<String> {
+        return listOf(
+            name,
+            "core_db/$name",
+            "assetpacks/core_db/$name",
+            "assetpacks/core_db/assets/$name",
+            "assets/core_db/$name",
+            "flutter_assets/assets/db/$name",
+            "flutter_assets/$name",
+        )
+    }
+
+    private fun listAssetDir(path: String): List<String> {
+        return try {
+            assets.list(path)?.toList() ?: emptyList()
+        } catch (_: Exception) {
+            emptyList()
+        }
+    }
+
+    /**
+     * Searches the asset tree (breadth-first, bounded depth) for a file
+     * with the exact [name], returning its full asset path when found.
+     */
+    private fun findAssetByName(name: String): String? {
+        val queue = ArrayDeque<String>()
+        queue.add("")
+        var steps = 0
+        while (queue.isNotEmpty() && steps < 60) {
+            steps++
+            val dir = queue.removeFirst()
+            val entries = listAssetDir(dir)
+            for (entry in entries) {
+                val full = if (dir.isEmpty()) entry else "$dir/$entry"
+                if (entry == name) return full
+                if (entry.contains('.')) continue
+                queue.add(full)
+            }
+        }
         return null
     }
 
     companion object {
+        private const val TAG = "EPITAKA_ASSET_PACK"
         private const val CHANNEL = "epitaka/asset_pack"
         private const val PROCESS_TEXT_CHANNEL = "epitaka/process_text"
         private const val TTS_SETTINGS_CHANNEL = "epitaka/tts_settings"

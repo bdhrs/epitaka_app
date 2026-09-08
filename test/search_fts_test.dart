@@ -413,6 +413,67 @@ void main() {
     });
   });
 
+  group('heading search · diacritic-insensitive', () {
+    late ProviderContainer container;
+
+    setUp(() {
+      container = ProviderContainer(
+        overrides: [
+          appDbProvider.overrideWith((ref) async => appDb),
+          epitakaDbProvider.overrideWith((ref) async => epiDb),
+          // No translation DB in the fixture — best-effort skip (the
+          // default settings resolve the active language to 'en').
+          translationDbProvider('en').overrideWith((ref) async => null),
+          settingsProvider.overrideWith((ref) => SettingsNotifier(null)),
+        ],
+      );
+      addTearDown(container.dispose);
+    });
+
+    SearchResults current() =>
+        container.read(searchProvider) as SearchResults;
+
+    test('a query without diacritics finds diacritic headings', () async {
+      // Fixture headings are stored with diacritics: "Dīgha Nikāya" and
+      // "Kaṅkhāvitaraṇī". A plain-ASCII query must still match them.
+      await container.read(searchProvider.notifier).search(query: 'digha');
+      final result = current();
+      expect(
+        result.headings.map((h) => h.title),
+        contains('Dīgha Nikāya'),
+      );
+    });
+
+    test('query with diacritics finds the same headings', () async {
+      await container
+          .read(searchProvider.notifier)
+          .search(query: 'kaṅkhāv');
+      final result = current();
+      expect(
+        result.headings.map((h) => h.title),
+        contains('Kaṅkhāvitaraṇī'),
+      );
+    });
+
+    test('a multi-word query matches a spaced heading title', () async {
+      await container
+          .read(searchProvider.notifier)
+          .search(query: 'digha nikaya');
+      final result = current();
+      expect(
+        result.headings.map((h) => h.title),
+        contains('Dīgha Nikāya'),
+      );
+    });
+
+    test('non-matching queries return no headings', () async {
+      await container
+          .read(searchProvider.notifier)
+          .search(query: 'gavaya');
+      expect(current().headings, isEmpty);
+    });
+  });
+
   group('index schema version stamping', () {
     // Each test gets its own freshly built index so the shared `appDb`
     // is never left in a mutated state.

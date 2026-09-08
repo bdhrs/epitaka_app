@@ -70,38 +70,100 @@ void main() {
     },
   );
 
-  testWidgets('DpdHeadwordCard renders lemma and meaning without onWordTap', (
-    tester,
-  ) async {
-    final container = ProviderContainer();
-    addTearDown(container.dispose);
-    final prefs = await SharedPreferences.getInstance();
-    container.read(settingsProvider.notifier).init(prefs);
+  testWidgets(
+    'DpdHeadwordCard is collapsed by default: short preview shown, '
+    'detail hidden until tapped',
+    (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final prefs = await SharedPreferences.getInstance();
+      container.read(settingsProvider.notifier).init(prefs);
 
-    tester.view.physicalSize = const Size(600, 800);
-    tester.view.devicePixelRatio = 1.0;
-    addTearDown(tester.view.reset);
+      tester.view.physicalSize = const Size(600, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
 
-    await tester.pumpWidget(
-      UncontrolledProviderScope(
-        container: container,
-        child: MaterialApp(
-          home: Scaffold(
-            body: DpdHeadwordCard(
-              lemma: 'khīṇāsava',
-              meaningHtml:
-                  '<p>One who has destroyed the cankers. '
-                  'See <a href="lookup://khina">khīṇa</a>.</p>',
-              colors: ThemeData().colorScheme,
+      const meaningHtml =
+          '<details class="dpd-meaning"><summary><i>adjective</i> '
+          '<b>free from desire</b></summary>'
+          '<div class="dpd-meaning-detail"><b>Grammar:</b> adj</div>'
+          '</details>';
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: DpdHeadwordCard(
+                lemma: 'khīṇāsava',
+                meaningHtml: meaningHtml,
+                colors: ThemeData().colorScheme,
+              ),
             ),
           ),
         ),
-      ),
-    );
-    await tester.pump();
+      );
+      await tester.pump();
 
-    // Lemma + meaning render as normal text.
-    expect(find.text('khīṇāsava'), findsOneWidget);
-    expect(find.textContaining('destroyed the cankers'), findsOneWidget);
-  });
+      // Lemma + short meaning preview (the <summary> gloss) are visible…
+      expect(find.text('khīṇāsava'), findsOneWidget);
+      expect(find.textContaining('free from desire'), findsOneWidget);
+      // …and the full detail HTML is NOT rendered while collapsed.
+      expect(find.byType(Html), findsNothing);
+      expect(find.textContaining('Grammar'), findsNothing);
+
+      // Tap the headword → full detail meaning expands.
+      await tester.tap(find.text('khīṇāsava'));
+      await tester.pump();
+      expect(find.byType(Html), findsOneWidget);
+      expect(find.textContaining('Grammar'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'DpdHeadwordCard collapses again on second tap, and falls back to '
+    'stripped text preview when the entry has no <summary>',
+    (tester) async {
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final prefs = await SharedPreferences.getInstance();
+      container.read(settingsProvider.notifier).init(prefs);
+
+      tester.view.physicalSize = const Size(600, 800);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(tester.view.reset);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            home: Scaffold(
+              body: DpdHeadwordCard(
+                lemma: 'khīṇāsava',
+                meaningHtml:
+                    '<p>One who has destroyed the cankers. '
+                    'See <a href="lookup://khina">khīṇa</a>.</p>',
+                colors: ThemeData().colorScheme,
+              ),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // No <summary>: the collapsed preview falls back to the whole entry
+      // stripped to plain text.
+      expect(find.textContaining('destroyed the cankers'), findsOneWidget);
+      expect(find.byType(Html), findsNothing);
+
+      // Expand, then collapse again — the second tap restores the preview.
+      await tester.tap(find.text('khīṇāsava'));
+      await tester.pump();
+      expect(find.byType(Html), findsOneWidget);
+      await tester.tap(find.text('khīṇāsava'));
+      await tester.pump();
+      expect(find.byType(Html), findsNothing);
+      expect(find.textContaining('destroyed the cankers'), findsOneWidget);
+    },
+  );
 }

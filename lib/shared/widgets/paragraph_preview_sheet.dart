@@ -11,6 +11,7 @@ import '../../core/utils/native_lookup_service.dart';
 import '../../features/dictionary/widgets/dictionary_open.dart';
 import 'pali_text.dart';
 import 'preview_content.dart';
+import 'wide_bottom_sheet.dart';
 
 Future<void> showParagraphPreviewSheet(
   BuildContext context, {
@@ -48,6 +49,8 @@ Future<void> showParagraphPreviewSheet(
     useRootNavigator: useRootNavigator,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // Wide screens: span 80% of the app instead of the 640 px default cap.
+    constraints: wideBottomSheetConstraints(context),
     builder: (_) => _ParagraphPreviewSheet(
       title: title,
       subtitle: subtitle ?? '',
@@ -276,11 +279,14 @@ class _ParagraphPreviewSheetState extends ConsumerState<_ParagraphPreviewSheet> 
             label: '${loc.search} "${_truncateLabel(searchable)}"',
             onPressed: () {
               selectableRegionState.clearSelection();
+              // Stack the dictionary on top of this sheet (forceSheet) so
+              // closing it returns to the preview/book-link content instead
+              // of dumping the user back on the reader.
               openDictionaryInPanel(
                 context,
                 ref,
                 searchable,
-                closeSheet: true,
+                forceSheet: true,
               );
             },
           ),
@@ -461,14 +467,15 @@ class _ParagraphPreviewSheetState extends ConsumerState<_ParagraphPreviewSheet> 
                               paliSnippet: w.paliSnippet,
                               lineKeys: _lineKeys,
                               onPaliWordTap: (word) {
-                                // Close the preview sheet and open the dictionary
-                                // in the panel/dock instead (desktop sidebar or
-                                // mobile bottom dock).
+                                // Open the dictionary as a NEW sheet on top of
+                                // this one (forceSheet) instead of closing the
+                                // preview — closing the dictionary returns to
+                                // the commentary being read here.
                                 openDictionaryInPanel(
                                   context,
                                   ref,
                                   word,
-                                  closeSheet: true,
+                                  forceSheet: true,
                                 );
                               },
                             ),

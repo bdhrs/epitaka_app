@@ -25,24 +25,27 @@ final epitakaDbProvider = FutureProvider<EpitakaDatabase>((ref) async {
 /// raw code here means any language offered by the manifest works.
 final translationDbProvider =
     FutureProvider.family<TranslationDatabase?, String>((ref, langCode) async {
-  final dbDir = await getDatabaseDirectory();
-  final dbPath = p.join(dbDir.path, TranslationFilenameParser.build(langCode));
-  final file = File(dbPath);
-  if (!await file.exists()) {
-    return null;
-  }
-  return TranslationDatabase.open(dbPath);
-});
+      final dbDir = await getDatabaseDirectory();
+      final dbPath = p.join(
+        dbDir.path,
+        TranslationFilenameParser.build(langCode),
+      );
+      if (!await _isUsableDbFile(dbPath)) {
+        return null;
+      }
+      return TranslationDatabase.open(dbPath);
+    });
 
 /// Provider for a translation database by version.
 /// Returns the appropriate database type (regular or nissaya) based on the
 /// version's isNissaya flag.
-final versionDbProvider =
-    FutureProvider.family<Object?, TranslationVersion>((ref, version) async {
+final versionDbProvider = FutureProvider.family<Object?, TranslationVersion>((
+  ref,
+  version,
+) async {
   final dbDir = await getDatabaseDirectory();
   final dbPath = p.join(dbDir.path, version.filename);
-  final file = File(dbPath);
-  if (!await file.exists()) return null;
+  if (!await _isUsableDbFile(dbPath)) return null;
 
   if (version.isNissaya) {
     return NissayaDatabase.open(dbPath);
@@ -53,10 +56,17 @@ final versionDbProvider =
 /// Provider for a nissaya database by filename.
 final nissayaDbByFilenameProvider =
     FutureProvider.family<NissayaDatabase?, String>((ref, filename) async {
-  final dbDir = await getDatabaseDirectory();
-  final dbPath = p.join(dbDir.path, filename);
-  final file = File(dbPath);
-  if (!await file.exists()) return null;
-  return NissayaDatabase.open(dbPath);
-});
+      final dbDir = await getDatabaseDirectory();
+      final dbPath = p.join(dbDir.path, filename);
+      if (!await _isUsableDbFile(dbPath)) return null;
+      return NissayaDatabase.open(dbPath);
+    });
 
+Future<bool> _isUsableDbFile(String dbPath) async {
+  try {
+    final file = File(dbPath);
+    return await file.exists() && await file.length() > 0;
+  } catch (_) {
+    return false;
+  }
+}

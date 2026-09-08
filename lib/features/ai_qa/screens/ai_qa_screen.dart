@@ -51,6 +51,7 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
   final _textController = TextEditingController();
   final _scrollController = ScrollController();
   final _focusNode = FocusNode();
+  final _chatFocusNode = FocusNode();
   final _scaffoldKey = GlobalKey<ScaffoldState>();
   final _mentionLayerLink = LayerLink();
 
@@ -100,6 +101,7 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
   void dispose() {
     _textController.removeListener(_onTextChanged);
     _focusNode.removeListener(_onFocusChanged);
+    _chatFocusNode.dispose();
     _textController.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
@@ -216,6 +218,37 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     Future.delayed(const Duration(milliseconds: 100), _scrollToBottom);
   }
 
+  KeyEventResult _handleChatNavigationKey(FocusNode node, KeyEvent event) {
+    if (event is! KeyDownEvent && event is! KeyRepeatEvent) {
+      return KeyEventResult.ignored;
+    }
+    if (_focusNode.hasFocus || _mentionActive) return KeyEventResult.ignored;
+    final key = event.logicalKey;
+    if (key == LogicalKeyboardKey.keyJ || key == LogicalKeyboardKey.arrowDown) {
+      _scrollController.animateTo(
+        (_scrollController.offset + 160).clamp(
+          0.0,
+          _scrollController.position.maxScrollExtent,
+        ),
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+      );
+      return KeyEventResult.handled;
+    }
+    if (key == LogicalKeyboardKey.keyK || key == LogicalKeyboardKey.arrowUp) {
+      _scrollController.animateTo(
+        (_scrollController.offset - 160).clamp(
+          0.0,
+          _scrollController.position.maxScrollExtent,
+        ),
+        duration: const Duration(milliseconds: 120),
+        curve: Curves.easeOut,
+      );
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   void _scrollToBottom() {
     try {
       if (_scrollController.hasClients &&
@@ -279,11 +312,16 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
             onPressed: () {
               Navigator.of(ctx).pop();
               if (currentThreadId != null) {
-                ref.read(chatHistoryNotifierProvider).deleteThread(currentThreadId);
+                ref
+                    .read(chatHistoryNotifierProvider)
+                    .deleteThread(currentThreadId);
                 ref.read(aiQaProvider.notifier).clearChat();
               }
             },
-            child: Text(loc.delete, style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            child: Text(
+              loc.delete,
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
           ),
         ],
       ),
@@ -297,10 +335,8 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (ctx) => _InThreadSearchSheet(
-        messages: messages,
-        colors: colors,
-      ),
+      builder: (ctx) =>
+          _InThreadSearchSheet(messages: messages, colors: colors),
     );
   }
 
@@ -358,11 +394,13 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
 
     // Watch current thread for pinned state
     final isPinned = currentThreadId != null
-        ? ref.watch(chatThreadProvider(currentThreadId)).when(
-            data: (t) => t?.isPinned ?? false,
-            loading: () => false,
-            error: (_, __) => false,
-          )
+        ? ref
+              .watch(chatThreadProvider(currentThreadId))
+              .when(
+                data: (t) => t?.isPinned ?? false,
+                loading: () => false,
+                error: (_, __) => false,
+              )
         : false;
 
     ref.listen(aiQaProvider, (prev, next) {
@@ -439,17 +477,12 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
         actions: [
           // New chat button
           IconButton(
-            icon: Icon(
-              Icons.add,
-              size: 22,
-              color: colors.onSurfaceVariant,
-            ),
+            icon: Icon(Icons.add, size: 22, color: colors.onSurfaceVariant),
             tooltip: AppLocalizations.of(context).newChat,
             onPressed: _startNewChat,
           ),
           // Overflow menu: history, settings, clear
-          PopupMenuButton<String>
-            (
+          PopupMenuButton<String>(
             icon: Icon(
               Icons.more_vert,
               size: 20,
@@ -462,7 +495,9 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                   break;
                 case 'pin':
                   if (currentThreadId != null) {
-                    ref.read(chatHistoryNotifierProvider).toggleThreadPinned(currentThreadId);
+                    ref
+                        .read(chatHistoryNotifierProvider)
+                        .toggleThreadPinned(currentThreadId);
                   }
                   break;
                 case 'search':
@@ -488,7 +523,11 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                   value: 'history',
                   child: Row(
                     children: [
-                      Icon(Icons.history, size: 18, color: colors.onSurfaceVariant),
+                      Icon(
+                        Icons.history,
+                        size: 18,
+                        color: colors.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 10),
                       Text(loc.chatHistory),
                     ],
@@ -502,7 +541,9 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                         Icon(
                           isPinned ? Icons.push_pin : Icons.push_pin_outlined,
                           size: 18,
-                          color: isPinned ? colors.primary : colors.onSurfaceVariant,
+                          color: isPinned
+                              ? colors.primary
+                              : colors.onSurfaceVariant,
                         ),
                         const SizedBox(width: 10),
                         Text(isPinned ? loc.unpinThread : loc.pinThread),
@@ -514,7 +555,11 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                     value: 'search',
                     child: Row(
                       children: [
-                        Icon(Icons.search, size: 18, color: colors.onSurfaceVariant),
+                        Icon(
+                          Icons.search,
+                          size: 18,
+                          color: colors.onSurfaceVariant,
+                        ),
                         const SizedBox(width: 10),
                         Text(loc.searchInThread),
                       ],
@@ -526,16 +571,26 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                   enabled: false,
                   child: Row(
                     children: [
-                      Icon(Icons.text_fields, size: 18, color: colors.onSurfaceVariant),
+                      Icon(
+                        Icons.text_fields,
+                        size: 18,
+                        color: colors.onSurfaceVariant,
+                      ),
                       const SizedBox(width: 10),
-                      Text(loc.fontSize, style: TextStyle(color: colors.onSurfaceVariant)),
+                      Text(
+                        loc.fontSize,
+                        style: TextStyle(color: colors.onSurfaceVariant),
+                      ),
                       const Spacer(),
                       // Decrease button
                       GestureDetector(
                         onTap: fs > 0.7
                             ? () {
-                                ref.read(aiQaSettingsProvider.notifier)
-                                    .setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
+                                ref
+                                    .read(aiQaSettingsProvider.notifier)
+                                    .setChatFontSize(
+                                      (fs - 0.1).clamp(0.7, 2.0),
+                                    );
                               }
                             : null,
                         child: Container(
@@ -544,13 +599,17 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                           decoration: BoxDecoration(
                             color: fs > 0.7
                                 ? colors.surfaceContainerHighest
-                                : colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                                : colors.surfaceContainerHighest.withValues(
+                                    alpha: 0.3,
+                                  ),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Icon(
                             Icons.remove,
                             size: 16,
-                            color: fs > 0.7 ? colors.onSurface : colors.onSurface.withValues(alpha: 0.3),
+                            color: fs > 0.7
+                                ? colors.onSurface
+                                : colors.onSurface.withValues(alpha: 0.3),
                           ),
                         ),
                       ),
@@ -567,8 +626,11 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                       GestureDetector(
                         onTap: fs < 2.0
                             ? () {
-                                ref.read(aiQaSettingsProvider.notifier)
-                                    .setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
+                                ref
+                                    .read(aiQaSettingsProvider.notifier)
+                                    .setChatFontSize(
+                                      (fs + 0.1).clamp(0.7, 2.0),
+                                    );
                               }
                             : null,
                         child: Container(
@@ -577,13 +639,17 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                           decoration: BoxDecoration(
                             color: fs < 2.0
                                 ? colors.surfaceContainerHighest
-                                : colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                                : colors.surfaceContainerHighest.withValues(
+                                    alpha: 0.3,
+                                  ),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Icon(
                             Icons.add,
                             size: 16,
-                            color: fs < 2.0 ? colors.onSurface : colors.onSurface.withValues(alpha: 0.3),
+                            color: fs < 2.0
+                                ? colors.onSurface
+                                : colors.onSurface.withValues(alpha: 0.3),
                           ),
                         ),
                       ),
@@ -596,7 +662,13 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                   value: 'settings',
                   child: Row(
                     children: [
-                      Icon(Icons.tune, size: 18, color: settings.isValid ? colors.onSurfaceVariant : Colors.orange),
+                      Icon(
+                        Icons.tune,
+                        size: 18,
+                        color: settings.isValid
+                            ? colors.onSurfaceVariant
+                            : Colors.orange,
+                      ),
                       const SizedBox(width: 10),
                       Text(loc.vimamsaSettings),
                     ],
@@ -608,7 +680,11 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                     value: 'clear',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, size: 18, color: colors.error),
+                        Icon(
+                          Icons.delete_outline,
+                          size: 18,
+                          color: colors.error,
+                        ),
                         const SizedBox(width: 10),
                         Text(
                           loc.clearChat,
@@ -623,41 +699,61 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
           ),
         ],
       ),
-      body: CallbackShortcuts(
-        bindings: <ShortcutActivator, VoidCallback>{
-          // Cmd/Ctrl + N: New chat
-          const SingleActivator(LogicalKeyboardKey.keyN, control: true): _startNewChat,
-          const SingleActivator(LogicalKeyboardKey.keyN, meta: true): _startNewChat,
-          // Cmd/Ctrl + F: Search in thread
-          const SingleActivator(LogicalKeyboardKey.keyF, control: true): _showInThreadSearch,
-          const SingleActivator(LogicalKeyboardKey.keyF, meta: true): _showInThreadSearch,
-          // Cmd/Ctrl + +: Increase font size
-          const SingleActivator(LogicalKeyboardKey.equal, control: true): () {
-            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
-            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
+      body: Focus(
+        focusNode: _chatFocusNode,
+        autofocus: true,
+        onKeyEvent: _handleChatNavigationKey,
+        child: CallbackShortcuts(
+          bindings: <ShortcutActivator, VoidCallback>{
+            // Cmd/Ctrl + N: New chat
+            const SingleActivator(LogicalKeyboardKey.keyN, control: true):
+                _startNewChat,
+            const SingleActivator(LogicalKeyboardKey.keyN, meta: true):
+                _startNewChat,
+            // Cmd/Ctrl + F: Search in thread
+            const SingleActivator(LogicalKeyboardKey.keyF, control: true):
+                _showInThreadSearch,
+            const SingleActivator(LogicalKeyboardKey.keyF, meta: true):
+                _showInThreadSearch,
+            // Cmd/Ctrl + +: Increase font size
+            const SingleActivator(LogicalKeyboardKey.equal, control: true): () {
+              final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+              ref
+                  .read(aiQaSettingsProvider.notifier)
+                  .setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
+            },
+            const SingleActivator(LogicalKeyboardKey.equal, meta: true): () {
+              final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+              ref
+                  .read(aiQaSettingsProvider.notifier)
+                  .setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
+            },
+            // Cmd/Ctrl + -: Decrease font size
+            const SingleActivator(LogicalKeyboardKey.minus, control: true): () {
+              final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+              ref
+                  .read(aiQaSettingsProvider.notifier)
+                  .setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
+            },
+            const SingleActivator(LogicalKeyboardKey.minus, meta: true): () {
+              final fs = ref.read(aiQaSettingsProvider).chatFontSize;
+              ref
+                  .read(aiQaSettingsProvider.notifier)
+                  .setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
+            },
+            // Cmd/Ctrl + 0: Reset font size
+            const SingleActivator(
+              LogicalKeyboardKey.digit0,
+              control: true,
+            ): () {
+              ref.read(aiQaSettingsProvider.notifier).setChatFontSize(1.0);
+            },
+            const SingleActivator(LogicalKeyboardKey.digit0, meta: true): () {
+              ref.read(aiQaSettingsProvider.notifier).setChatFontSize(1.0);
+            },
           },
-          const SingleActivator(LogicalKeyboardKey.equal, meta: true): () {
-            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
-            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs + 0.1).clamp(0.7, 2.0));
-          },
-          // Cmd/Ctrl + -: Decrease font size
-          const SingleActivator(LogicalKeyboardKey.minus, control: true): () {
-            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
-            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
-          },
-          const SingleActivator(LogicalKeyboardKey.minus, meta: true): () {
-            final fs = ref.read(aiQaSettingsProvider).chatFontSize;
-            ref.read(aiQaSettingsProvider.notifier).setChatFontSize((fs - 0.1).clamp(0.7, 2.0));
-          },
-          // Cmd/Ctrl + 0: Reset font size
-          const SingleActivator(LogicalKeyboardKey.digit0, control: true): () {
-            ref.read(aiQaSettingsProvider.notifier).setChatFontSize(1.0);
-          },
-          const SingleActivator(LogicalKeyboardKey.digit0, meta: true): () {
-            ref.read(aiQaSettingsProvider.notifier).setChatFontSize(1.0);
-          },
-        },
-        child: body,
+          child: body,
+        ),
       ),
     );
   } // ── Build helpers ─────────────────────────────────────────────────────
@@ -674,71 +770,73 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
     required List<HeadingAttachment> attachments,
   }) {
     return MediaQuery(
-      data: MediaQuery.of(context).copyWith(
-        textScaler: TextScaler.linear(settings.chatFontSize),
-      ),
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(settings.chatFontSize)),
       child: Stack(
-      children: [
-        // Main content column (messages + attachment bar + input)
-        Column(
-          children: [
-            if (error != null) _buildErrorBanner(error, colors),
-            _buildMentionIndexBanner(colors),
-            if (currentThreadId != null && messages.isNotEmpty)
-              _buildThreadIndicator(currentThreadId, colors),
-            Expanded(
-              child: messages.isEmpty
-                  ? _buildEmptyState(context, isLoading, settings, colors)
-                  : AiQaMessageListView(
-                      scrollController: _scrollController,
-                      messages: messages,
-                      latestResponseKey: _latestResponseKey,
-                      onEditMessage: (text) {
-                        _textController.text = text;
-                        _focusNode.requestFocus();
-                      },
-                      onRetryMessage: () {
-                        // Re-send the last user message
-                        final lastUserMsg = messages
-                            .where((m) => m.isUser)
-                            .lastOrNull;
-                        if (lastUserMsg != null) {
-                          ref.read(aiQaProvider.notifier).sendMessage(lastUserMsg.text);
-                        }
-                      },
-                    ),
-            ),
+        children: [
+          // Main content column (messages + attachment bar + input)
+          Column(
+            children: [
+              if (error != null) _buildErrorBanner(error, colors),
+              _buildMentionIndexBanner(colors),
+              if (currentThreadId != null && messages.isNotEmpty)
+                _buildThreadIndicator(currentThreadId, colors),
+              Expanded(
+                child: messages.isEmpty
+                    ? _buildEmptyState(context, isLoading, settings, colors)
+                    : AiQaMessageListView(
+                        scrollController: _scrollController,
+                        messages: messages,
+                        latestResponseKey: _latestResponseKey,
+                        onEditMessage: (text) {
+                          _textController.text = text;
+                          _focusNode.requestFocus();
+                        },
+                        onRetryMessage: () {
+                          // Re-send the last user message
+                          final lastUserMsg = messages
+                              .where((m) => m.isUser)
+                              .lastOrNull;
+                          if (lastUserMsg != null) {
+                            ref
+                                .read(aiQaProvider.notifier)
+                                .sendMessage(lastUserMsg.text);
+                          }
+                        },
+                      ),
+              ),
 
-            // ── Answer mode (orthodox / knowledge) ────────────────────
-            _AnswerModeToggle(colors: colors),
+              // ── Answer mode (orthodox / knowledge) ────────────────────
+              _AnswerModeToggle(colors: colors),
 
-            // ── Attachment chips bar ──────────────────────────────────
-            if (attachments.isNotEmpty) const AttachmentBar(),
+              // ── Attachment chips bar ──────────────────────────────────
+              if (attachments.isNotEmpty) const AttachmentBar(),
 
-            // ── Input bar ─────────────────────────────────────────────
-            _AiQaInputBar(
-              isLoading: isLoading,
-              textController: _textController,
-              focusNode: _focusNode,
-              onSend: _sendMessage,
-              onStop: () => ref.read(aiQaProvider.notifier).stopGeneration(),
-              layerLink: _mentionLayerLink,
-              onKeyEvent: _handleKeyEvent,
-            ),
-          ],
-        ),
-
-        // ── @ Mention Overlay (floats above input bar, positioned via LayerLink) ─
-        if (_mentionActive)
-          CompositedTransformFollower(
-            link: _mentionLayerLink,
-            offset: const Offset(0, -8),
-            targetAnchor: Alignment.topLeft,
-            followerAnchor: Alignment.bottomLeft,
-            child: const MentionOverlay(),
+              // ── Input bar ─────────────────────────────────────────────
+              _AiQaInputBar(
+                isLoading: isLoading,
+                textController: _textController,
+                focusNode: _focusNode,
+                onSend: _sendMessage,
+                onStop: () => ref.read(aiQaProvider.notifier).stopGeneration(),
+                layerLink: _mentionLayerLink,
+                onKeyEvent: _handleKeyEvent,
+              ),
+            ],
           ),
-      ],
-    ),
+
+          // ── @ Mention Overlay (floats above input bar, positioned via LayerLink) ─
+          if (_mentionActive)
+            CompositedTransformFollower(
+              link: _mentionLayerLink,
+              offset: const Offset(0, -8),
+              targetAnchor: Alignment.topLeft,
+              followerAnchor: Alignment.bottomLeft,
+              child: const MentionOverlay(),
+            ),
+        ],
+      ),
     );
   }
 
@@ -765,11 +863,7 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
             ),
           ),
           IconButton(
-            icon: Icon(
-              Icons.add,
-              size: 18,
-              color: colors.onSurfaceVariant,
-            ),
+            icon: Icon(Icons.add, size: 18, color: colors.onSurfaceVariant),
             tooltip: AppLocalizations.of(context).newChat,
             visualDensity: VisualDensity.compact,
             onPressed: _startNewChat,
@@ -798,7 +892,11 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                 value: 'history',
                 child: Row(
                   children: [
-                    Icon(Icons.history, size: 16, color: colors.onSurfaceVariant),
+                    Icon(
+                      Icons.history,
+                      size: 16,
+                      color: colors.onSurfaceVariant,
+                    ),
                     const SizedBox(width: 8),
                     Text(AppLocalizations.of(context).chatHistory),
                   ],
@@ -808,7 +906,13 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
                 value: 'settings',
                 child: Row(
                   children: [
-                    Icon(Icons.tune, size: 16, color: settings.isValid ? colors.onSurfaceVariant : Colors.orange),
+                    Icon(
+                      Icons.tune,
+                      size: 16,
+                      color: settings.isValid
+                          ? colors.onSurfaceVariant
+                          : Colors.orange,
+                    ),
                     const SizedBox(width: 8),
                     Text(AppLocalizations.of(context).vimamsaSettings),
                   ],
@@ -1129,7 +1233,9 @@ class _InThreadSearchSheetState extends State<_InThreadSearchSheet> {
                 hintText: AppLocalizations.of(context).searchInThread,
                 prefixIcon: const Icon(Icons.search, size: 18),
                 filled: true,
-                fillColor: widget.colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                fillColor: widget.colors.surfaceContainerHighest.withValues(
+                  alpha: 0.3,
+                ),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
@@ -1171,7 +1277,9 @@ class _InThreadSearchSheetState extends State<_InThreadSearchSheet> {
                           msg.isUser ? 'User' : 'Assistant',
                           style: AppTypography.labelSmall.copyWith(
                             fontSize: 10,
-                            color: widget.colors.onSurfaceVariant.withValues(alpha: 0.5),
+                            color: widget.colors.onSurfaceVariant.withValues(
+                              alpha: 0.5,
+                            ),
                           ),
                         ),
                         onTap: () => Navigator.of(context).pop(),
@@ -1213,9 +1321,7 @@ class _InThreadSearchSheetState extends State<_InThreadSearchSheet> {
     if (start > 0) display = '…$display';
     if (end < text.length) display = '$display…';
     return Text.rich(
-      TextSpan(
-        children: _buildHighlightedSpans(display, query),
-      ),
+      TextSpan(children: _buildHighlightedSpans(display, query)),
       maxLines: 2,
       overflow: TextOverflow.ellipsis,
     );
@@ -1227,30 +1333,36 @@ class _InThreadSearchSheetState extends State<_InThreadSearchSheet> {
     int lastEnd = 0;
     for (final match in query.allMatches(lower)) {
       if (match.start > lastEnd) {
-        spans.add(TextSpan(
-          text: text.substring(lastEnd, match.start),
+        spans.add(
+          TextSpan(
+            text: text.substring(lastEnd, match.start),
+            style: AppTypography.labelSmall.copyWith(
+              color: widget.colors.onSurface,
+            ),
+          ),
+        );
+      }
+      spans.add(
+        TextSpan(
+          text: text.substring(match.start, match.end),
           style: AppTypography.labelSmall.copyWith(
             color: widget.colors.onSurface,
+            backgroundColor: widget.colors.primary.withValues(alpha: 0.2),
+            fontWeight: FontWeight.w600,
           ),
-        ));
-      }
-      spans.add(TextSpan(
-        text: text.substring(match.start, match.end),
-        style: AppTypography.labelSmall.copyWith(
-          color: widget.colors.onSurface,
-          backgroundColor: widget.colors.primary.withValues(alpha: 0.2),
-          fontWeight: FontWeight.w600,
         ),
-      ));
+      );
       lastEnd = match.end;
     }
     if (lastEnd < text.length) {
-      spans.add(TextSpan(
-        text: text.substring(lastEnd),
-        style: AppTypography.labelSmall.copyWith(
-          color: widget.colors.onSurface,
+      spans.add(
+        TextSpan(
+          text: text.substring(lastEnd),
+          style: AppTypography.labelSmall.copyWith(
+            color: widget.colors.onSurface,
+          ),
         ),
-      ));
+      );
     }
     return spans;
   }
@@ -1264,7 +1376,8 @@ class _ThreadHistorySheet extends ConsumerStatefulWidget {
   const _ThreadHistorySheet();
 
   @override
-  ConsumerState<_ThreadHistorySheet> createState() => _ThreadHistorySheetState();
+  ConsumerState<_ThreadHistorySheet> createState() =>
+      _ThreadHistorySheetState();
 }
 
 class _ThreadHistorySheetState extends ConsumerState<_ThreadHistorySheet> {
@@ -1364,7 +1477,9 @@ class _ThreadHistorySheetState extends ConsumerState<_ThreadHistorySheet> {
                     hintText: AppLocalizations.of(context).searchHistory,
                     prefixIcon: const Icon(Icons.search, size: 18),
                     filled: true,
-                    fillColor: colors.surfaceContainerHighest.withValues(alpha: 0.3),
+                    fillColor: colors.surfaceContainerHighest.withValues(
+                      alpha: 0.3,
+                    ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(24),
                       borderSide: BorderSide.none,
@@ -1388,10 +1503,12 @@ class _ThreadHistorySheetState extends ConsumerState<_ThreadHistorySheet> {
                     final filtered = _searchQuery.trim().isEmpty
                         ? threads
                         : threads
-                            .where((t) => t.title
-                                .toLowerCase()
-                                .contains(_searchQuery.toLowerCase()))
-                            .toList();
+                              .where(
+                                (t) => t.title.toLowerCase().contains(
+                                  _searchQuery.toLowerCase(),
+                                ),
+                              )
+                              .toList();
                     if (filtered.isEmpty) {
                       return Center(
                         child: Text(
@@ -1456,9 +1573,13 @@ class _ThreadHistoryTile extends ConsumerWidget {
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(
-          isActive ? Icons.chat : (thread.isPinned ? Icons.push_pin : Icons.chat_bubble_outline),
+          isActive
+              ? Icons.chat
+              : (thread.isPinned ? Icons.push_pin : Icons.chat_bubble_outline),
           size: 16,
-          color: isActive ? colors.primary : (thread.isPinned ? colors.primary : colors.onSurfaceVariant),
+          color: isActive
+              ? colors.primary
+              : (thread.isPinned ? colors.primary : colors.onSurfaceVariant),
         ),
       ),
       title: Row(
@@ -1537,7 +1658,9 @@ class _ThreadHistoryTile extends ConsumerWidget {
               onSelected: (value) async {
                 switch (value) {
                   case 'pin':
-                    ref.read(chatHistoryNotifierProvider).toggleThreadPinned(thread.id);
+                    ref
+                        .read(chatHistoryNotifierProvider)
+                        .toggleThreadPinned(thread.id);
                     break;
                   case 'delete':
                     final confirm = await showDialog<bool>(
@@ -1582,7 +1705,9 @@ class _ThreadHistoryTile extends ConsumerWidget {
                     child: Row(
                       children: [
                         Icon(
-                          thread.isPinned ? Icons.push_pin : Icons.push_pin_outlined,
+                          thread.isPinned
+                              ? Icons.push_pin
+                              : Icons.push_pin_outlined,
                           size: 16,
                         ),
                         const SizedBox(width: 8),
@@ -1594,7 +1719,11 @@ class _ThreadHistoryTile extends ConsumerWidget {
                     value: 'delete',
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline, size: 16, color: colors.error),
+                        Icon(
+                          Icons.delete_outline,
+                          size: 16,
+                          color: colors.error,
+                        ),
                         const SizedBox(width: 8),
                         Text(loc.delete, style: TextStyle(color: colors.error)),
                       ],
@@ -1882,9 +2011,7 @@ class _AiQaInputBar extends ConsumerWidget {
             borderRadius: BorderRadius.circular(24),
             child: InkWell(
               borderRadius: BorderRadius.circular(24),
-              onTap: isLoading
-                  ? onStop
-                  : (isThreadFull ? null : onSend),
+              onTap: isLoading ? onStop : (isThreadFull ? null : onSend),
               child: _StopOrSendButton(
                 isLoading: isLoading,
                 isThreadFull: isThreadFull,
@@ -1975,11 +2102,7 @@ class _StopOrSendButtonState extends State<_StopOrSendButton>
                 : null,
           ),
           child: widget.isLoading
-              ? Icon(
-                  Icons.stop_rounded,
-                  color: widget.colors.error,
-                  size: 24,
-                )
+              ? Icon(Icons.stop_rounded, color: widget.colors.error, size: 24)
               : Icon(
                   widget.isThreadFull ? Icons.lock : Icons.arrow_upward,
                   color: widget.isThreadFull

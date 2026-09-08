@@ -50,8 +50,7 @@ class DesktopShell extends ConsumerStatefulWidget {
 }
 
 class _DesktopShellState extends ConsumerState<DesktopShell> {
-  final ReaderToolbarController _toolbarController =
-      ReaderToolbarController();
+  final ReaderToolbarController _toolbarController = ReaderToolbarController();
 
   /// Whether the sidebar is docked on the right side of the window.
   bool _sidebarOnRight = false;
@@ -66,10 +65,12 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
       if (!mounted) return;
       final s = ref.read(settingsProvider);
       setState(() {
-        _leftWidth =
-            s.leftPanelWidth > 0 ? s.leftPanelWidth : _kDefaultLeftWidth;
-        _rightWidth =
-            s.rightPanelWidth > 0 ? s.rightPanelWidth : _kDefaultRightWidth;
+        _leftWidth = s.leftPanelWidth > 0
+            ? s.leftPanelWidth
+            : _kDefaultLeftWidth;
+        _rightWidth = s.rightPanelWidth > 0
+            ? s.rightPanelWidth
+            : _kDefaultRightWidth;
         _sidebarOnRight = s.sidebarOnRight;
       });
     });
@@ -201,11 +202,13 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
                     activeSidebar: left,
                     vimamsaActive: vimamsaOpen,
                     onToggleSidebar: _toggleSidebar,
-                    onToggleVimamsa: () => ref
-                        .read(vimamsaOpenProvider.notifier)
-                        .toggle(),
+                    onToggleVimamsa: () =>
+                        ref.read(vimamsaOpenProvider.notifier).toggle(),
                     onResetLayout: resetLayout,
                     onOpenSettings: () => showSettingsDialog(context),
+                  ),
+                  _ActivityRailDivider(
+                    visible: showLeftSidebar || showRightSidebar,
                   ),
                   // Left sidebar
                   Container(
@@ -272,6 +275,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
     AppLocalizations loc,
   ) {
     final vimamsaOpen = ref.watch(vimamsaOpenProvider);
+    final tabsState = ref.watch(readerTabsProvider);
+    final bookName = tabsState.activeTab?.bookName;
     return ReaderToolbarScope(
       controller: _toolbarController,
       child: Column(
@@ -279,10 +284,9 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
           _CenterTabs(
             colors: colors,
             vimamsaSelected: vimamsaOpen,
-            readingLabel: loc.reading,
+            readingLabel: bookName ?? loc.reading,
             vimamsaLabel: loc.vimamsa,
-            onReadingTap: () =>
-                ref.read(vimamsaOpenProvider.notifier).close(),
+            onReadingTap: () => ref.read(vimamsaOpenProvider.notifier).close(),
             onVimamsaTap: () => ref.read(vimamsaOpenProvider.notifier).open(),
           ),
           Divider(height: 1, color: colors.outlineVariant),
@@ -344,9 +348,7 @@ class DesktopSidebar extends StatelessWidget {
               onDragRight: onMoveSidebarRight,
               onDragLeft: onMoveSidebarLeft,
               tooltip: loc.t(
-                onRight
-                    ? 'Move panel to the left'
-                    : 'Move panel to the right',
+                onRight ? 'Move panel to the left' : 'Move panel to the right',
               ),
             ),
           ),
@@ -445,11 +447,7 @@ class _Grip extends StatefulWidget {
   final VoidCallback? onDragLeft;
   final String tooltip;
 
-  const _Grip({
-    this.onDragRight,
-    this.onDragLeft,
-    required this.tooltip,
-  });
+  const _Grip({this.onDragRight, this.onDragLeft, required this.tooltip});
 
   @override
   State<_Grip> createState() => _GripState();
@@ -484,7 +482,8 @@ class _GripState extends State<_Grip> {
           onHorizontalDragEnd: (d) {
             setState(() => _dragging = false);
             final velocity = d.primaryVelocity ?? 0;
-            if ((_accumDx > 80 || velocity > 300) && widget.onDragRight != null) {
+            if ((_accumDx > 80 || velocity > 300) &&
+                widget.onDragRight != null) {
               widget.onDragRight!();
             } else if ((_accumDx < -80 || velocity < -300) &&
                 widget.onDragLeft != null) {
@@ -540,6 +539,24 @@ class _PanelDivider extends StatefulWidget {
 
   @override
   State<_PanelDivider> createState() => _PanelDividerState();
+}
+
+class _ActivityRailDivider extends StatelessWidget {
+  final bool visible;
+
+  const _ActivityRailDivider({required this.visible});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      width: 1,
+      color: visible
+          ? colors.outlineVariant.withValues(alpha: 0.7)
+          : Colors.transparent,
+    );
+  }
 }
 
 class _PanelDividerState extends State<_PanelDivider> {

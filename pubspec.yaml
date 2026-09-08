@@ -84,12 +84,16 @@ dependencies:
   # Color picker for settings & startup wizard
   flutter_colorpicker: ^1.1.0
 
-  # URL launcher for help links
+  # URL launcher for help links and desktop release updates
   url_launcher: ^6.3.1
 
   # Cloud sync: auth + annotations (highlights, notes, bookmarks)
   supabase_flutter: ^2.8.1
 
+  # Keep the screen awake during long downloads / index builds.
+  # No permissions needed: Android uses FLAG_KEEP_SCREEN_ON (WAKE_LOCK
+  # is already declared), iOS uses idleTimerDisabled, desktop/web need none.
+  wakelock_plus: ^1.3.2
   # Download progress notifications on Android
   flutter_local_notifications: ^18.0.1
   # Android foreground service: keeps translation downloads running when

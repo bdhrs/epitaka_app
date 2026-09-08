@@ -46,6 +46,7 @@ import '../widgets/reader_bottom_toolbar.dart';
 import '../widgets/reader_content_with_selection.dart';
 import '../widgets/reader_context_menu_builder.dart';
 import '../widgets/reader_drag_thumb.dart';
+import '../widgets/reader_highlight_bundle.dart';
 import '../widgets/reader_in_book_search_bar.dart';
 import '../widgets/reader_tts_widgets.dart';
 import '../widgets/tab_strip.dart';
@@ -311,7 +312,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
       return;
     }
     final notifier = ref.read(sidePanelProvider.notifier);
-    if (ref.read(sidePanelProvider).right.openPanel ==
+    if (ref.read(sidePanelProvider).left.openPanel ==
         SidePanelType.dictionary) {
       notifier.close(SidePanelType.dictionary);
       return;
@@ -1092,7 +1093,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // desktop shell. While it's open, the floating pill and the TTS chip
     // are hidden so nothing overlaps it.
     final dictDockOpen =
-        ref.watch(sidePanelProvider).right.openPanel ==
+        ref.watch(sidePanelProvider).left.openPanel ==
         SidePanelType.dictionary;
 
     // Inside the desktop shell, the attached status bar drives the reader's
@@ -1695,6 +1696,30 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         ? lookupHighlight
         : null;
 
+    // Bundle every cross-paragraph highlight input into one value-equality
+    // object so the paragraph list can memoize rebuilds per paragraph: only
+    // the paragraph(s) a highlight actually touches rebuild.
+    final highlightBundle = ReaderHighlightBundle(
+      bookId: activeTab.bookId,
+      searchQuery:
+          ref.watch(inBookSearchProvider).effectiveQuery ??
+          activeTab.searchQuery,
+      lookupHighlight: activeLookupHighlight,
+      ttsHighlightLineId: ttsHighlightLineId,
+      ttsHighlightParaId: ttsHighlightParaId,
+      jumpHighlightLineId: _jumpHighlightLineId,
+      jumpHighlightParaId: _jumpHighlightParaId,
+      ttsTargetParaId: ref
+          .read(ttsSyncProvider(activeTab.bookId))
+          .ttsTargetParaId,
+      ttsTargetLineKeys: ref
+          .read(ttsSyncProvider(activeTab.bookId))
+          .ttsTargetLineKeys,
+      keyboardFocusParaId: keyboardFocusParaId,
+      keyboardFocusLineId: keyboardFocusLineId,
+      keyboardFocusChipIndex: keyboardFocusChipIndex,
+    );
+
     Widget content = ReaderContentWithSelection(
       bookId: activeTab.bookId,
       data: data,
@@ -1723,25 +1748,10 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
         selectableRegionState: state,
         contentHitTestKey: _contentHitTestKey,
       ),
+      highlightBundle: highlightBundle,
+      showBookLinks: settings.showBookLinks,
       annotations: ref.watch(paragraphAnnotationsProvider(activeTab.bookId)),
-      ttsHighlightLineId: ttsHighlightLineId,
-      ttsHighlightParaId: ttsHighlightParaId,
-      jumpHighlightLineId: _jumpHighlightLineId,
-      jumpHighlightParaId: _jumpHighlightParaId,
       appBarCollapsed: _appBarCollapsed,
-      ttsTargetParaId: ref
-          .read(ttsSyncProvider(activeTab.bookId))
-          .ttsTargetParaId,
-      ttsTargetLineKeys: ref
-          .read(ttsSyncProvider(activeTab.bookId))
-          .ttsTargetLineKeys,
-      keyboardFocusParaId: keyboardFocusParaId,
-      keyboardFocusLineId: keyboardFocusLineId,
-      keyboardFocusChipIndex: keyboardFocusChipIndex,
-      searchQuery:
-          ref.watch(inBookSearchProvider).effectiveQuery ??
-          activeTab.searchQuery,
-      lookupHighlight: activeLookupHighlight,
     );
 
     // When the dictionary sheet is open, Flutter adds bottom padding to the

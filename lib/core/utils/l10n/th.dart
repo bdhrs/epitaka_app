@@ -46,6 +46,7 @@ const Map<String, String> th = {
   'Pali (Roman script)': 'บาลี (อักษรโรมัน)',
   'Drag to reorder enabled translations. The first one is shown when multiple are enabled.':
       'ลากเพื่อจัดลำดับคำแปลที่เปิดใช้งาน รายการแรกจะแสดงเมื่อเปิดใช้งานหลายรายการ',
+  'Drag to reorder': 'ลากเพื่อจัดลำดับ',
   'No translations downloaded yet. Download a translation above to reorder it.':
       'ยังไม่ได้ดาวน์โหลดคำแปล ดาวน์โหลดคำแปลด้านบนเพื่อจัดลำดับ',
   'No translations found or available for download.':

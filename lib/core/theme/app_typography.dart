@@ -1,14 +1,29 @@
 import 'package:flutter/material.dart';
 
+import '../providers/settings_provider.dart' show UiFontFamily;
+
 /// Typography constants matching the ePitaka design spec.
 ///
 /// Uses Noto Serif for Pāli content and headings, Inter for UI and translations.
+/// The UI font can be changed via [setUiFontFamily].
 class AppTypography {
   AppTypography._();
 
   // ── Font Families ───────────────────────────────────────────────────
   static const String paliFont = 'NotoSerif';
-  static const String translationFont = 'Inter';
+  static String translationFont = 'Roboto'; // Default UI font
+
+  /// Update the UI font family used for labels, menus, and buttons.
+  ///
+  /// This affects the [translationFont] which is used in the app's
+  /// [ThemeData.textTheme] for UI chrome. Reading fonts (Pāli/translations)
+  /// remain independent and are controlled by [ReadingFontFamily].
+  static void setUiFontFamily(UiFontFamily font) {
+    translationFont = font.fontFamily;
+  }
+
+  /// Get the current UI font family string.
+  static String get uiFontFamily => translationFont;
 
   // ── Text Styles ─────────────────────────────────────────────────────
 
@@ -45,7 +60,8 @@ class AppTypography {
   );
 
   /// Body Translation — 17px/28px Regular — for translation text
-  static const TextStyle bodyTranslation = TextStyle(
+  /// Uses [translationFont] so it follows the user's UI font choice.
+  static TextStyle get bodyTranslation => TextStyle(
     fontFamily: translationFont,
     fontSize: 17,
     fontWeight: FontWeight.w400,
@@ -53,7 +69,8 @@ class AppTypography {
   );
 
   /// Label Medium — 14px/20px Medium with 2% letter spacing — for UI labels
-  static const TextStyle labelMedium = TextStyle(
+  /// Uses [translationFont] so it follows the user's UI font choice.
+  static TextStyle get labelMedium => TextStyle(
     fontFamily: translationFont,
     fontSize: 14,
     fontWeight: FontWeight.w500,
@@ -62,7 +79,8 @@ class AppTypography {
   );
 
   /// Label Small — 12px/16px Medium with 4% letter spacing — for caption text
-  static const TextStyle labelSmall = TextStyle(
+  /// Uses [translationFont] so it follows the user's UI font choice.
+  static TextStyle get labelSmall => TextStyle(
     fontFamily: translationFont,
     fontSize: 12,
     fontWeight: FontWeight.w500,
@@ -85,13 +103,11 @@ class AppTypography {
     translationLineHeight = 28 / 17;
   }
 
-  static TextStyle get scaledBodyPali => bodyPali.copyWith(
-        fontSize: paliFontSize,
-        height: paliLineHeight,
-      );
+  static TextStyle get scaledBodyPali =>
+      bodyPali.copyWith(fontSize: paliFontSize, height: paliLineHeight);
 
   static TextStyle get scaledBodyTranslation => bodyTranslation.copyWith(
-        fontSize: translationFontSize,
-        height: translationLineHeight,
-      );
+    fontSize: translationFontSize,
+    height: translationLineHeight,
+  );
 }

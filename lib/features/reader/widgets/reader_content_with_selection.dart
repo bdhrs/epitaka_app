@@ -5,9 +5,9 @@ import 'package:scrollable_positioned_list/scrollable_positioned_list.dart';
 
 import '../../../core/providers/settings_provider.dart';
 import '../../annotations/models/annotation.dart';
-import '../providers/reader_lookup_highlight_provider.dart';
 import '../providers/reader_provider.dart';
 import 'reader_content_list.dart';
+import 'reader_highlight_bundle.dart';
 
 /// Wraps a [ReaderContentList] in a [Listener] for hit-testing,
 /// an [AnimatedBuilder] for tab swipe animation, and a [SelectionArea]
@@ -30,27 +30,18 @@ class ReaderContentWithSelection extends StatelessWidget {
     required this.dragDxNotifier,
     required this.selectableRegionKey,
     required this.onPointerDown,
+    required this.highlightBundle,
     this.onPointerMove,
     this.onPointerUp,
     this.onPointerCancel,
     this.scrollOffsetController,
     required this.onSelectionChanged,
     required this.contextMenuBuilder,
-    this.ttsHighlightLineId,
-    this.ttsHighlightParaId,
-    this.jumpHighlightLineId,
-    this.jumpHighlightParaId,
-    this.ttsTargetParaId,
-    this.ttsTargetLineKeys = const {},
-    this.keyboardFocusParaId,
-    this.keyboardFocusLineId,
-    this.keyboardFocusChipIndex,
-    this.searchQuery,
+    this.showBookLinks = true,
     this.onFirstContentFrame,
     this.initialScrollIndex,
     this.annotations = const {},
     this.appBarCollapsed,
-    this.lookupHighlight,
   });
 
   final String bookId;
@@ -85,27 +76,12 @@ class ReaderContentWithSelection extends StatelessWidget {
   final void Function(SelectedContent?) onSelectionChanged;
   final Widget Function(BuildContext, SelectableRegionState) contextMenuBuilder;
 
-  // TTS
-  final int? ttsHighlightLineId;
-  final int? ttsHighlightParaId;
+  /// Cross-paragraph highlight state (search, lookup, TTS, jump, keyboard
+  /// cursor) threaded to the list, which slices it per paragraph.
+  final ReaderHighlightBundle highlightBundle;
 
-  // Jump highlight
-  final int? jumpHighlightLineId;
-  final int? jumpHighlightParaId;
-
-  final int? ttsTargetParaId;
-  final Map<int, GlobalKey> ttsTargetLineKeys;
-
-  // Keyboard navigation focus (reading cursor)
-  final int? keyboardFocusParaId;
-  final int? keyboardFocusLineId;
-  final int? keyboardFocusChipIndex;
-
-  // Search
-  final String? searchQuery;
-
-  // Active dictionary lookup highlight
-  final ReaderLookupHighlight? lookupHighlight;
+  /// Whether inlined book-link chips (commentary links) are rendered.
+  final bool showBookLinks;
 
   // Starting scroll index (prevents flash-to-top on tab restore)
   final int? initialScrollIndex;
@@ -137,18 +113,8 @@ class ReaderContentWithSelection extends StatelessWidget {
       itemPositionsListener: itemPositionsListener,
       scrollOffsetListener: scrollOffsetListener,
       scrollOffsetController: scrollOffsetController,
-      ttsHighlightLineId: ttsHighlightLineId,
-      ttsHighlightParaId: ttsHighlightParaId,
-      jumpHighlightLineId: jumpHighlightLineId,
-      jumpHighlightParaId: jumpHighlightParaId,
-      ttsTargetParaId: ttsTargetParaId,
-      ttsTargetLineKeys: ttsTargetLineKeys,
-      keyboardFocusParaId: keyboardFocusParaId,
-      keyboardFocusLineId: keyboardFocusLineId,
-      keyboardFocusChipIndex: keyboardFocusChipIndex,
-      showBookLinks: settings.showBookLinks,
-      searchQuery: searchQuery,
-      lookupHighlight: lookupHighlight,
+      highlightBundle: highlightBundle,
+      showBookLinks: showBookLinks,
       onFirstContentFrame: onFirstContentFrame,
       initialScrollIndex: initialScrollIndex,
       annotations: annotations,

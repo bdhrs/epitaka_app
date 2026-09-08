@@ -3,12 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/settings_provider.dart';
 import '../../core/utils/app_localizations.dart';
+import '../../features/ai_qa/providers/ai_qa_settings_provider.dart';
 import '../../features/reader/providers/reader_provider.dart';
 import '../../features/reader/providers/reader_tabs_provider.dart';
 import '../../features/reader/providers/tts_reading_provider.dart';
 import '../../features/reader/services/reader_ai_service.dart';
 import '../../features/reader/widgets/reader_bottom_toolbar.dart';
 import '../../features/settings/providers/tts_provider.dart';
+import '../../shared/providers/vimamsa_panel_provider.dart';
 import '../../shared/utils/app_shortcuts.dart';
 import '../../shared/widgets/reader_toolbar_controller.dart';
 
@@ -38,6 +40,7 @@ class DesktopStatusBar extends ConsumerWidget {
     final settings = ref.watch(settingsProvider);
     final ttsReading = ref.watch(ttsReadingProvider);
     final globalTts = ref.watch(ttsProvider);
+    final vimamsaActive = ref.watch(vimamsaOpenProvider);
     final activeTab = ref.watch(readerTabsProvider.select((s) => s.activeTab));
     final isCurrentBookTts = ttsReading.bookId == activeTab?.bookId;
     final ttsPlayback = isCurrentBookTts ? globalTts : TtsPlaybackState.stopped;
@@ -108,9 +111,21 @@ class DesktopStatusBar extends ConsumerWidget {
                               loc.decreaseFontSize,
                               'font-decrease',
                             ),
-                            onTap: () => ref
-                                .read(settingsProvider.notifier)
-                                .decreaseFontSize(),
+                            onTap: () {
+                              ref
+                                  .read(settingsProvider.notifier)
+                                  .decreaseFontSize();
+                              if (vimamsaActive) {
+                                final fs = ref
+                                    .read(aiQaSettingsProvider)
+                                    .chatFontSize;
+                                ref
+                                    .read(aiQaSettingsProvider.notifier)
+                                    .setChatFontSize(
+                                      (fs - 0.1).clamp(0.7, 2.0),
+                                    );
+                              }
+                            },
                           ),
                           _StatusIconButton(
                             icon: Icons.text_increase,
@@ -118,9 +133,21 @@ class DesktopStatusBar extends ConsumerWidget {
                               loc.increaseFontSize,
                               'font-increase',
                             ),
-                            onTap: () => ref
-                                .read(settingsProvider.notifier)
-                                .increaseFontSize(),
+                            onTap: () {
+                              ref
+                                  .read(settingsProvider.notifier)
+                                  .increaseFontSize();
+                              if (vimamsaActive) {
+                                final fs = ref
+                                    .read(aiQaSettingsProvider)
+                                    .chatFontSize;
+                                ref
+                                    .read(aiQaSettingsProvider.notifier)
+                                    .setChatFontSize(
+                                      (fs + 0.1).clamp(0.7, 2.0),
+                                    );
+                              }
+                            },
                           ),
                           const SizedBox(width: 4),
                           Container(

@@ -64,6 +64,11 @@ class AppLocalizations {
 
   /// Title of the "What's New" dialog shown after an app update.
   String get whatsNew => _t("What's New");
+  String get desktopUpdateAvailable => _t('Desktop update available');
+  String desktopUpdateDescription(String version) =>
+      _t('Version $version is available. Download it from the official GitHub release page.');
+  String get downloadUpdate => _t('Download update');
+  String get later => _t('Later');
 
   /// Error prefix for `Error: $message` lines.
   String errorMessage(String message) => '${_t('Error')}: $message';
@@ -1153,6 +1158,7 @@ class AppLocalizations {
   String get reorderTranslationsHint => _t(
     'Drag to reorder enabled translations. The first one is shown when multiple are enabled.',
   );
+  String get dragToReorder => _t('Drag to reorder');
   String get noTranslationsDownloadedYet => _t(
     'No translations downloaded yet. Download a translation above to reorder it.',
   );

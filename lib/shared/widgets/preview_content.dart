@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show BoxHitTestResult, RenderParagraph;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/providers/settings_provider.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/pali_script_converter.dart';
 import '../../core/utils/pali_text_utils.dart';
+import '../../features/reader/utils/reader_word_hit_test.dart'
+    show cleanPali, wordRangeAt;
 import 'pali_text.dart';
 import 'nissaya_text.dart';
 import '../utils/html_text_parser.dart';
@@ -170,7 +173,6 @@ class PreviewContent extends ConsumerWidget {
 
     return _buildTappablePali(
       child: HtmlTextParser.richText(converted, baseStyle, maxLines: null),
-      paliText: snippet,
     );
   }
 
@@ -195,30 +197,80 @@ class PreviewContent extends ConsumerWidget {
 
     return _buildTappablePali(
       child: PaliHtmlText(text, style: baseStyle, maxLines: null),
-      paliText: text,
     );
   }
 
   /// Wrap Pāli content in GestureDetector for double-tap dictionary lookup.
-  Widget _buildTappablePali({required Widget child, required String paliText}) {
+  ///
+  /// The double-tap resolves the word UNDER the pointer (hit-tested from the
+  /// tap position), not the first word of the line — the line text may wrap
+  /// onto multiple visual rows and may have been converted to a non-Roman
+  /// script, so a plain text split cannot locate the tapped word. The
+  /// [Builder] provides a context whose render subtree contains exactly this
+  /// line's text paragraph, which the hit-test needs.
+  Widget _buildTappablePali({required Widget child}) {
     if (onPaliWordTap == null) return child;
 
-    return GestureDetector(
-      onDoubleTap: () {
-        // Extract meaningful Pāli words from the text
-        final words = paliText
-            .replaceAll(RegExp(r'<[^>]*>'), ' ') // strip HTML tags
-            .replaceAll(RegExp(r'[^\wāīūṅñṭḍṇḷṃĀĪŪṄÑṬḌṆḶṀ\s]'), ' ')
-            .trim()
-            .split(RegExp(r'\s+'))
-            .where((w) => w.length >= 2)
-            .toList();
-        if (words.isNotEmpty) {
-          onPaliWordTap!(words.first);
-        }
+    return Builder(
+      builder: (context) {
+        Offset? doubleTapPosition;
+        return GestureDetector(
+          onDoubleTapDown: (details) {
+            doubleTapPosition = details.globalPosition;
+          },
+          onDoubleTap: () {
+            final pos = doubleTapPosition;
+            if (pos == null) return;
+            _lookupWordAtTap(context, pos);
+          },
+          child: child,
+        );
       },
-      child: child,
     );
+  }
+
+  /// Look up the Pāli word rendered under [globalPosition] inside [context]'s
+  /// render subtree (one Pāli line).
+  ///
+  /// Hit-tests the subtree to find the [RenderParagraph] under the pointer,
+  /// maps the tap offset to a text position, expands to the surrounding word
+  /// (space/punctuation-delimited, same rules as the reader), converts it
+  /// back to Roman for the dictionary, and reports it via [onPaliWordTap].
+  /// Taps on whitespace/punctuation (no word there) look up nothing.
+  void _lookupWordAtTap(BuildContext context, Offset globalPosition) {
+    final onTap = onPaliWordTap;
+    if (onTap == null) return;
+
+    final renderBox = context.findRenderObject();
+    if (renderBox is! RenderBox || !renderBox.attached) return;
+
+    final result = BoxHitTestResult();
+    renderBox.hitTest(
+      result,
+      position: renderBox.globalToLocal(globalPosition),
+    );
+
+    RenderParagraph? paragraph;
+    for (final entry in result.path) {
+      if (entry.target is RenderParagraph) {
+        paragraph = entry.target as RenderParagraph;
+        break;
+      }
+    }
+    if (paragraph == null) return;
+
+    final localInParagraph =
+        globalPosition - paragraph.localToGlobal(Offset.zero);
+    final textPosition = paragraph.getPositionForOffset(localInParagraph);
+    final fullText = paragraph.text.toPlainText();
+    final range = wordRangeAt(fullText, textPosition.offset);
+    if (range.isCollapsed) return;
+
+    final rawWord = fullText.substring(range.start, range.end);
+    // Convert from the display script (if any) back to Roman for lookup.
+    final cleaned = cleanPali(convertToRomanPali(rawWord));
+    if (cleaned.length < 2) return;
+    onTap(cleaned);
   }
 
   Widget _buildTranslationLine(

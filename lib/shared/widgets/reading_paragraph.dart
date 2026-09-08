@@ -191,8 +191,12 @@ class ReadingParagraph extends StatelessWidget {
             paragraph.pageNumber != null)
           _buildPageBreakMarker(paragraph.pageNumber!, colors),
 
-        // Content with vertical line flush to left
-        _buildContentWithVerticalLine(context, colors),
+        // Content with vertical line flush to left for line-by-line and
+        // joined modes; side-by-side already has its own divider.
+        if (displayMode == ParagraphDisplayMode.sideBySide)
+          _buildContentBlock(context, colors)
+        else
+          _buildContentWithVerticalLine(context, colors),
       ],
     );
   }
@@ -836,6 +840,8 @@ class ReadingParagraph extends StatelessWidget {
         extraAnnotations: annotations
             .where((a) => a.segment == 'pali' && a.paraId == paragraph.paraId)
             .toList(),
+        textAlign: TextAlign.left,
+        lineHeightOverride: 1.8,
       ),
     );
 
@@ -920,6 +926,8 @@ class ReadingParagraph extends StatelessWidget {
     ColorScheme colors, {
     int? lineId,
     List<Annotation>? extraAnnotations,
+    TextAlign? textAlign,
+    double? lineHeightOverride,
   }) {
     final paliTypography = this.paliTypography;
     final effectiveColor = paliTypography.effectiveColor(paliColor);
@@ -930,7 +938,7 @@ class ReadingParagraph extends StatelessWidget {
       decoration: paliTypography.underline
           ? TextDecoration.underline
           : TextDecoration.none,
-      height: paliTypography.lineHeight,
+      height: lineHeightOverride ?? paliTypography.lineHeight,
       color: effectiveColor,
     );
 
@@ -973,6 +981,7 @@ class ReadingParagraph extends StatelessWidget {
         colors,
         annotations: lineAnnotations,
         lookupHighlight: isLookupTarget ? lookupHighlight : null,
+        textAlign: textAlign,
       );
     }
 
@@ -981,6 +990,7 @@ class ReadingParagraph extends StatelessWidget {
       script: script,
       colors: colors,
       style: baseStyle,
+      textAlign: textAlign,
     );
   }
 
@@ -1057,6 +1067,7 @@ class ReadingParagraph extends StatelessWidget {
     ColorScheme colors, {
     List<Annotation> annotations = const [],
     ReaderLookupHighlight? lookupHighlight,
+    TextAlign? textAlign,
   }) {
     final spans = _parseHtml(text);
 
@@ -1128,7 +1139,10 @@ class ReadingParagraph extends StatelessWidget {
       }
     }
 
-    return Text.rich(TextSpan(style: baseStyle, children: result));
+    return Text.rich(
+      TextSpan(style: baseStyle, children: result),
+      textAlign: textAlign,
+    );
   }
 
   /// Locate the active lookup highlight interval in stripped character space.

@@ -79,7 +79,12 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
     // is a read (not a watch): subsequent word updates arrive through the
     // [ref.listen] in build, and watching here would rebuild the whole panel
     // on every sidePanelProvider change (e.g. panel-width drags) for nothing.
-    final panelData = ref.read(sidePanelProvider).right.panelData;
+    final panels = ref.read(sidePanelProvider);
+    final panelData = panels.left.openPanel == SidePanelType.dictionary
+        ? panels.left.panelData
+        : panels.right.openPanel == SidePanelType.dictionary
+        ? panels.right.panelData
+        : null;
     if (panelData != null) {
       _syncPanelWord(panelData);
     }
@@ -248,7 +253,11 @@ class _DictionaryPanelState extends ConsumerState<DictionaryPanel> {
     // picked up a new word when something else (a window resize) happened to
     // rebuild it. React to the provider change explicitly instead.
     ref.listen(sidePanelProvider, (prev, next) {
-      final word = next.right.panelData;
+      final word = next.left.openPanel == SidePanelType.dictionary
+          ? next.left.panelData
+          : next.right.openPanel == SidePanelType.dictionary
+          ? next.right.panelData
+          : null;
       if (word != null) _syncPanelWord(word);
     });
 
@@ -568,6 +577,7 @@ class _DpdSection extends ConsumerStatefulWidget {
 class _DpdSectionState extends ConsumerState<_DpdSection> {
   /// Which deconstructor candidate card is expanded (-1 = none).
   int _activeDeconCardIndex = -1;
+  bool _dpdExpanded = true;
 
   /// Which token inside the expanded candidate is selected.
   int _activeDeconTokenIndex = 0;
@@ -613,36 +623,49 @@ class _DpdSectionState extends ConsumerState<_DpdSection> {
             ),
           ],
         ),
-        const SizedBox(height: 4),
-        Text(
-          lookup.searchedKey,
-          style: AppTypography.headlineSmall.copyWith(
-            color: colors.onSurface,
-            fontSize: (pali.fontSize * 1.0).clamp(16.0, 30.0),
-            fontWeight: FontWeight.bold,
-            fontFamily: paliFontFamily,
+        // Headword row — always visible as the expand/collapse toggle.
+        GestureDetector(
+          onTap: () => setState(() => _dpdExpanded = !_dpdExpanded),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: AppDimensions.sm),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    lookup.searchedKey,
+                    style: AppTypography.headlineSmall.copyWith(
+                      color: colors.onSurface,
+                      fontSize: (pali.fontSize * 1.0).clamp(16.0, 30.0),
+                      fontWeight: FontWeight.bold,
+                      fontFamily: paliFontFamily,
+                    ),
+                  ),
+                ),
+                Icon(
+                  _dpdExpanded ? Icons.expand_less : Icons.expand_more,
+                  size: 20,
+                  color: colors.onSurfaceVariant,
+                ),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 6),
-
-        // Deconstructor cards (word breakup) — same as the dictionary
-        // sheet. This was missing from the desktop panel: compound words
-        // like cirakālasamparicitaṃ only have a deconstructor (no direct
-        // headword with a meaning), so the panel showed nothing but the
-        // searched-word title.
-        if (lookup.hasDeconstructor) ...[
-          _buildDeconstructorSection(colors, lookup),
-          const SizedBox(height: 12),
+        if (_dpdExpanded) ...[
+          const SizedBox(height: 6),
+          if (lookup.hasDeconstructor) ...[
+            _buildDeconstructorSection(colors, lookup),
+            const SizedBox(height: 12),
+          ],
+          ...lookup.headwords.map(
+            (hw) => DpdHeadwordCard(
+              lemma: hw.lemma1,
+              meaningHtml: hw.meaningHtml,
+              colors: colors,
+              compact: true,
+              showBorder: false,
+            ),
+          ),
         ],
-
-        ...lookup.headwords.map(
-          (hw) => DpdHeadwordCard(
-            lemma: hw.lemma1,
-            meaningHtml: hw.meaningHtml,
-            colors: colors,
-            compact: true,
-          ),
-        ),
       ],
     );
   }

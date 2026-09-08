@@ -126,7 +126,8 @@ class TranslationVersion {
     Map<String, dynamic> json,
   ) {
     final suffix = json['suffix'] as String? ?? '';
-    final isNissaya = json['type'] == 'nissaya' ||
+    final isNissaya =
+        json['type'] == 'nissaya' ||
         TranslationFilenameParser.isNissaya(languageCode) ||
         TranslationFilenameParser.isNissaya(suffix);
     final filename = suffix.isNotEmpty
@@ -383,14 +384,23 @@ class TranslationFilenameParser {
   static String defaultFilename(String code) => 'epitaka_$code.db';
 
   /// Scan a directory and return all detected translation versions.
+  ///
+  /// Zero-byte files are ignored: they are leftovers of interrupted copies
+  /// and must never mark a translation as installed — the database couldn't
+  /// be opened and the UI would wrongly offer "Ready" instead of "Download"
+  /// (or vice versa, depending on the checking provider).
   static List<TranslationVersion> scanDirectory(Directory dir) {
     final result = <TranslationVersion>[];
     try {
-      final files = dir.listSync().whereType<File>().map(
-        (f) => p.basename(f.path),
-      );
-      for (final filename in files) {
+      final files = dir.listSync().whereType<File>();
+      for (final file in files) {
+        final filename = p.basename(file.path);
         if (!matches(filename)) continue;
+        try {
+          if (file.lengthSync() == 0) continue;
+        } catch (_) {
+          continue;
+        }
         final (code, suffix) = parse(filename);
         if (code.isEmpty) continue;
         result.add(

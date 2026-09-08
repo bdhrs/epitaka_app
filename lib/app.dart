@@ -9,11 +9,18 @@ import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/utils/app_localizations.dart';
+import 'core/utils/keep_awake.dart';
 import 'core/utils/l10n/app_strings.dart';
+import 'core/providers/dpd_dictionary_provider.dart';
 import 'core/providers/settings_provider.dart';
+import 'features/indexing/index_controller.dart';
+import 'features/settings/providers/translation_download_provider.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/app_typography.dart';
 import 'features/annotations/widgets/sync_lifecycle_observer.dart';
 import 'features/changelog/changelog_service.dart';
+import 'features/update/app_update_dialog.dart';
+import 'features/update/app_update_service.dart';
 import 'features/deep_links/deep_link_service.dart';
 import 'features/indexing/index_gate.dart';
 import 'features/settings/services/tts_audio_handler.dart';
@@ -122,6 +129,7 @@ class EpitakaApp extends ConsumerStatefulWidget {
 
 class _EpitakaAppState extends ConsumerState<EpitakaApp> {
   late final GoRouter _router;
+  final _updateService = AppUpdateService();
 
   /// Passed to GoRouter (see `buildRouter`) so AppShortcuts can resolve a
   /// BuildContext that's under MaterialApp/GoRouter at invocation time —
@@ -143,7 +151,43 @@ class _EpitakaAppState extends ConsumerState<EpitakaApp> {
     // Initialize settings from SharedPreferences
     SharedPreferences.getInstance().then((prefs) {
       ref.read(settingsProvider.notifier).init(prefs);
+      // Initialize the UI font from persisted settings
+      final settings = ref.read(settingsProvider);
+      AppTypography.setUiFontFamily(settings.uiFontFamily);
     });
+
+    // Warm the DPD dictionary connection shortly after startup. Opening
+    // dpd-dictionary.db takes ~100+ ms of synchronous sqlite work on first
+    // use; doing it while the app idles means the first double-tap lookup
+    // (reader, book-link sheet, …) only pays the query itself instead of
+    // open + query. The handle is cached by [dpdDictionaryDbProvider].
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      Future<void>.delayed(const Duration(seconds: 2), _warmUpDictionary);
+    });
+  }
+
+  void _warmUpDictionary() {
+    if (!mounted) return;
+    // Ignore errors: if the DB is missing/not yet downloaded, the lazy open
+    // path on first lookup reports the same error as before.
+    ref.read(dpdDictionaryDbProvider.future).ignore();
+    developer.log('[DICT] DPD warm-up triggered', name: 'epitaka.dict');
+  }
+
+  Future<void> _checkForDesktopUpdate() async {
+    try {
+      final update = await _updateService.checkForUpdate();
+      if (!mounted || update == null) return;
+      final context = _navigatorKey.currentContext;
+      if (context == null || !context.mounted) return;
+      await AppUpdateDialog.show(context, update, _updateService);
+    } catch (error, stackTrace) {
+      developer.log(
+        'Desktop update check failed: $error',
+        name: 'epitaka.update',
+        stackTrace: stackTrace,
+      );
+    }
   }
 
   @override
@@ -174,10 +218,13 @@ class _EpitakaAppState extends ConsumerState<EpitakaApp> {
     // key so the dialog appears above whatever screen the user lands on.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       ChangelogService.showIfNewBuild(_navigatorKey);
+      _checkForDesktopUpdate();
     });
 
     final settings = ref.watch(settingsProvider);
     final platformBrightness = MediaQuery.platformBrightnessOf(context);
+    // Update the UI font whenever settings change
+    AppTypography.setUiFontFamily(settings.uiFontFamily);
     // Build the exact theme the user chose (System resolves against the
     // platform brightness).  The resolved theme is applied as the single
     // active theme so every preference maps to its own color scheme.
@@ -189,42 +236,77 @@ class _EpitakaAppState extends ConsumerState<EpitakaApp> {
 
     return SyncLifecycleObserver(
       child: AudioServiceInitializer(
-        child: Consumer(
-          builder: (context, ref, _) {
-            final app = CallbackShortcuts(
-              bindings: AppShortcuts.bindings(_navigatorKey, ref),
-              child: MaterialApp.router(
-                title: 'ePitaka',
-                debugShowCheckedModeBanner: false,
-                // The resolved theme is set as the app theme; when no
-                // darkTheme is provided MaterialApp falls back to [theme] in
-                // every brightness, so the chosen scheme is always applied.
-                theme: theme,
-                routerConfig: _router,
-                locale: _resolveLocale(settings.appLanguage),
-                supportedLocales: AppLocalizationsDelegate.supportedLocales,
-                localizationsDelegates: [
-                  const AppLocalizationsDelegate(),
-                  GlobalMaterialLocalizations.delegate,
-                  GlobalWidgetsLocalizations.delegate,
-                  GlobalCupertinoLocalizations.delegate,
-                ],
-                builder: (context, child) => IndexGate(child: child!),
-              ),
-            );
+        child: _KeepAwakeBinder(
+          child: Consumer(
+            builder: (context, ref, _) {
+              final app = CallbackShortcuts(
+                bindings: AppShortcuts.bindings(_navigatorKey, ref),
+                child: MaterialApp.router(
+                  title: 'ePitaka',
+                  debugShowCheckedModeBanner: false,
+                  // The resolved theme is set as the app theme; when no
+                  // darkTheme is provided MaterialApp falls back to [theme] in
+                  // every brightness, so the chosen scheme is always applied.
+                  theme: theme,
+                  routerConfig: _router,
+                  locale: _resolveLocale(settings.appLanguage),
+                  supportedLocales: AppLocalizationsDelegate.supportedLocales,
+                  localizationsDelegates: [
+                    const AppLocalizationsDelegate(),
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  builder: (context, child) => IndexGate(child: child!),
+                ),
+              );
 
-            // On macOS, wraps `app` in a native PlatformMenuBar so shortcuts
-            // are listed in the system menu bar and macOS's own default
-            // Cmd+F ("Find…") no longer swallows ours before CallbackShortcuts
-            // sees it. On other platforms this is a no-op passthrough.
-            return AppShortcuts.menuBar(
-              navigatorKey: _navigatorKey,
-              ref: ref,
-              child: app,
-            );
-          },
+              // On macOS, wraps `app` in a native PlatformMenuBar so shortcuts
+              // are listed in the system menu bar and macOS's own default
+              // Cmd+F ("Find…") no longer swallows ours before CallbackShortcuts
+              // sees it. On other platforms this is a no-op passthrough.
+              return AppShortcuts.menuBar(
+                navigatorKey: _navigatorKey,
+                ref: ref,
+                child: app,
+              );
+            },
+          ),
         ),
       ),
     );
+  }
+}
+
+/// Keeps the screen awake while long work runs.
+///
+/// Watches the global reading setting, any active translation/core download,
+/// the index build, and the setup wizard's manual switch, then applies the
+/// OR-ed result through [KeepAwake]. Placed above [MaterialApp] so it is
+/// always mounted, whichever screen the user is on.
+class _KeepAwakeBinder extends ConsumerWidget {
+  final Widget child;
+
+  const _KeepAwakeBinder({required this.child});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final global = ref.watch(settingsProvider.select((s) => s.keepScreenOn));
+    final downloads = ref.watch(translationDownloadProvider);
+    final building = ref.watch(
+      indexControllerProvider.select((s) => s.isBuilding),
+    );
+    final override = ref.watch(keepAwakeOverrideProvider);
+    final busy =
+        building ||
+        downloads.values.any(
+          (d) =>
+              d.status == DownloadStatus.downloading ||
+              d.status == DownloadStatus.extracting,
+        );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      KeepAwake.apply(global: global, busy: busy, override: override);
+    });
+    return child;
   }
 }

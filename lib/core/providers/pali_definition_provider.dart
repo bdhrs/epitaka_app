@@ -126,6 +126,13 @@ final paliDefinitionProvider = FutureProvider.autoDispose
       // closest words survive the row limit: we rank distinct words by
       // (length, word) and keep at most [_maxPaliDefinitionWords] of them,
       // each with up to [_maxPaliDefinitionPerWord] canon occurrences.
+      //
+      // Matching uses GLOB (case-sensitive) instead of LIKE: the column
+      // ships indexed (`idx_palidef_word`) but `LIKE ?` is case-insensitive
+      // for ASCII, which defeats the BINARY index and forces a full index
+      // scan (~100 ms). GLOB is case-sensitive AND index-usable, and it is
+      // provably equivalent here because pali_definition.word is stored
+      // fully lowercase and [trimmed] is lowercased above.
       final prefix = paliDefinitionSearchPrefix(trimmed);
       if (prefix.isEmpty) return [];
 
@@ -137,7 +144,7 @@ final paliDefinitionProvider = FutureProvider.autoDispose
             '           ORDER BY length(word), word) AS word_rank, '
             '         ROW_NUMBER() OVER ('
             '           PARTITION BY word ORDER BY book_id, para_id, line_id) AS rn '
-            '  FROM pali_definition WHERE word LIKE ? '
+            '  FROM pali_definition WHERE word GLOB ? '
             ') '
             'SELECT book_id, para_id, line_id, word, plain, ending '
             'FROM ranked '
@@ -147,7 +154,7 @@ final paliDefinitionProvider = FutureProvider.autoDispose
             'WHERE (word_rank <= ? OR word = ?) AND rn <= ? '
             'ORDER BY length(word), word, book_id, para_id, line_id',
             variables: [
-              Variable.withString('$prefix%'),
+              Variable.withString('$prefix*'),
               Variable.withInt(_maxPaliDefinitionWords),
               Variable.withString(trimmed),
               Variable.withInt(_maxPaliDefinitionPerWord),

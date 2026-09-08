@@ -13,7 +13,7 @@ import '../providers/reader_tabs_provider.dart';
 ///
 /// Supports:
 /// - Tap to switch tabs
-/// - Long-press + drag on the **grip icon** (right side) to reorder tabs
+/// - Long-press + drag on the **grip icon** (left side) to reorder tabs
 /// - Natural horizontal scrolling by dragging anywhere else on the tab strip
 /// - Visual overflow indicators (fade gradients) when tabs overflow the viewport
 ///
@@ -209,8 +209,7 @@ class _TabStripState extends ConsumerState<TabStrip> {
                   ),
 
                 // ── Right fade gradient indicator ──────────────────
-                if (_isOverflowing &&
-                    _scrollOffset < _maxScrollExtent)
+                if (_isOverflowing && _scrollOffset < _maxScrollExtent)
                   Positioned(
                     right: 0,
                     child: IgnorePointer(
@@ -296,26 +295,10 @@ class _TabChip extends StatelessWidget {
                   : null,
             ),
             child: Padding(
-              padding: const EdgeInsets.only(left: 14),
+              padding: const EdgeInsets.only(left: 4),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // ── Tab label ─────────────────────────────────────
-                  Text(
-                    tab.bookId,
-                    style: AppTypography.labelMedium.copyWith(
-                      color: isActive
-                          ? colors.primary
-                          : colors.onSurfaceVariant,
-                      fontWeight:
-                          isActive ? FontWeight.w600 : FontWeight.w400,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  // ── Close button ──────────────────────────────────
-                  _CloseButton(onClose: onClose, isActive: isActive),
-                  const SizedBox(width: 2),
                   // ── Drag handle (grip) ────────────────────────────
                   ReorderableDragStartListener(
                     index: index,
@@ -330,6 +313,21 @@ class _TabChip extends StatelessWidget {
                       ),
                     ),
                   ),
+                  const SizedBox(width: 4),
+                  // ── Tab label ─────────────────────────────────────
+                  Text(
+                    tab.bookId,
+                    style: AppTypography.labelMedium.copyWith(
+                      color: isActive
+                          ? colors.primary
+                          : colors.onSurfaceVariant,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      fontSize: 13,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  // ── Close button ──────────────────────────────────
+                  _CloseButton(onClose: onClose, isActive: isActive),
                 ],
               ),
             ),

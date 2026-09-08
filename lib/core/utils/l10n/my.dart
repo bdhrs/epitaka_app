@@ -46,6 +46,7 @@ const Map<String, String> my = {
   'Pali (Roman script)': 'ပါဠိ (ရိုမန်အက္ခရာ)',
   'Drag to reorder enabled translations. The first one is shown when multiple are enabled.':
       'ဖွင့်ထားသော ဘာသာပြန်များကို ဆွဲ၍ အစီအစဉ်ပြောင်းပါ။ တစ်ခုထက်ပို၍ ဖွင့်ထားပါက ပထမတစ်ခုကို ပြသမည်။',
+  'Drag to reorder': 'ဆွဲ၍ အစီအစဉ်ပြောင်းရန်',
   'No translations downloaded yet. Download a translation above to reorder it.':
       'ဘာသာပြန်များ မဒေါင်းလုဒ်ရသေးပါ။ အစီအစဉ်ပြောင်းရန် အထက်တွင် ဘာသာပြန်တစ်ခုကို ဒေါင်းလုဒ်လုပ်ပါ။',
   'No translations found or available for download.':

@@ -342,17 +342,77 @@ class _TranslationsSection extends ConsumerWidget {
             return a.compareTo(b);
           });
 
+        // Enabled languages sit at the top in the same order as the
+        // Translations & Downloads settings screen — both read and write the
+        // shared enabledTranslations list, so reordering here is reflected
+        // there and vice versa. Drag the handle on an enabled row to reorder
+        // it; disabled rows (below) can't be reordered because they aren't
+        // part of the reading order.
+        final downloadedCodes = versions.map((v) => v.languageCode).toSet();
+
         return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            for (final code in langCodes)
-              _TranslationToggleTile(
-                englishName: TranslationLanguageRegistry.englishName(code),
-                nativeName: TranslationLanguageRegistry.nativeName(code),
-                value: settings.enabledTranslations.contains(code),
-                onChanged: (enabled) => ref
-                    .read(settingsProvider.notifier)
-                    .setTranslationEnabled(code, enabled),
+            if (langCodes.length > 1)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 2),
+                child: Text(
+                  loc.dragToReorder,
+                  style: TextStyle(
+                    fontSize: 10,
+                    color: colors.onSurfaceVariant,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
               ),
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: false,
+              children: langCodes.asMap().entries.map((entry) {
+                final index = entry.key;
+                final code = entry.value;
+                final enabled = settings.enabledTranslations.contains(code);
+                return _TranslationToggleTile(
+                  key: ValueKey(code),
+                  englishName: TranslationLanguageRegistry.englishName(code),
+                  nativeName: TranslationLanguageRegistry.nativeName(code),
+                  value: enabled,
+                  dragIndex: enabled ? index : null,
+                  onChanged: (v) => ref
+                      .read(settingsProvider.notifier)
+                      .setTranslationEnabled(code, v),
+                );
+              }).toList(),
+              onReorderItem: (oldIndex, newIndex) {
+                // Visual order of the whole list (enabled first, then
+                // disabled). onReorderItem already reports final indices.
+                final visualOrder = List<String>.from(langCodes);
+                final moved = visualOrder.removeAt(oldIndex);
+                visualOrder.insert(newIndex, moved);
+
+                // The new enabled order is the enabled codes in their
+                // dragged positions; disabled codes are not part of
+                // enabledTranslations.
+                final newEnabledOrder = visualOrder
+                    .where(settings.enabledTranslations.contains)
+                    .toList();
+
+                // Rebuild the FULL enabled list, keeping non-downloaded
+                // (e.g. database deleted) languages in place and applying
+                // the new order to the downloaded subset — same as the
+                // settings screen does.
+                final queue = List<String>.from(newEnabledOrder);
+                final full = settings.enabledTranslations.map((code) {
+                  if (!downloadedCodes.contains(code)) return code;
+                  return queue.removeAt(0);
+                }).toList();
+
+                ref
+                    .read(settingsProvider.notifier)
+                    .setTranslationsOrder(full);
+              },
+            ),
           ],
         );
       },
@@ -365,12 +425,18 @@ class _TranslationToggleTile extends StatelessWidget {
   final String englishName;
   final String nativeName;
   final bool value;
+
+  /// Non-null when this row is an enabled translation — shows a drag handle
+  /// and makes the row reorderable within the popup.
+  final int? dragIndex;
   final ValueChanged<bool> onChanged;
 
   const _TranslationToggleTile({
+    super.key,
     required this.englishName,
     required this.nativeName,
     required this.value,
+    this.dragIndex,
     required this.onChanged,
   });
 
@@ -407,6 +473,18 @@ class _TranslationToggleTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (dragIndex != null)
+              ReorderableDragStartListener(
+                index: dragIndex!,
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 6),
+                  child: Icon(
+                    Icons.drag_indicator,
+                    size: 18,
+                    color: colors.onSurfaceVariant.withValues(alpha: 0.55),
+                  ),
+                ),
+              ),
           ],
         ),
       ),

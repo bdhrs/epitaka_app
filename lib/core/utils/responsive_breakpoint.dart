@@ -11,7 +11,7 @@ class ResponsiveBreakpoint {
   ResponsiveBreakpoint._();
 
   /// Minimum width for desktop-style layout (sidebars, collapsible panels).
-  static const double desktopWidth = 900;
+  static const double desktopWidth = 600;
 
   /// Minimum width for tablet-style layout (hybrid panels, compact sidebars).
   static const double tabletWidth = 600;

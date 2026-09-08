@@ -131,11 +131,15 @@ class DpdHtmlRichText extends StatelessWidget {
           // Leaving weight unset lets it inherit from the ancestor as
           // normal HTML cascade would.
           'a': Style(color: linkColor, textDecoration: TextDecoration.none),
+          // Keep expand/collapse controls compact and aligned to the
+          // trailing edge; the definition itself remains full width.
           'details': Style(margin: Margins.only(bottom: 4)),
           'summary': Style(
+            display: Display.inlineBlock,
             fontWeight: FontWeight.w600,
             color: linkColor,
-            margin: Margins.only(bottom: 2),
+            margin: Margins.only(left: 4, bottom: 2),
+            padding: HtmlPaddings.zero,
           ),
           'div': Style(margin: Margins.only(bottom: 2)),
           'ul': Style(
@@ -206,13 +210,19 @@ class DictHtmlContent extends StatelessWidget {
 /// Displays a DPD headword with lemma and HTML meaning (rendered as-is,
 /// like the other dictionaries' definitions).
 ///
+/// Collapsed by default: the headword row carries the expand/collapse
+/// chevron plus a short plain-text preview of the meaning (the first
+/// `summary` gloss of the entry, clipped to two lines). Tapping the
+/// headword expands the full detail HTML.
+///
 /// Font sizes follow the app's Pāli typography settings so they scale with
 /// the reader (Ctrl/Cmd + / − and the Typography settings screen).
-class DpdHeadwordCard extends ConsumerWidget {
+class DpdHeadwordCard extends ConsumerStatefulWidget {
   final String lemma;
   final String? meaningHtml;
   final ColorScheme colors;
   final bool compact;
+  final bool showBorder;
 
   const DpdHeadwordCard({
     super.key,
@@ -220,61 +230,152 @@ class DpdHeadwordCard extends ConsumerWidget {
     this.meaningHtml,
     required this.colors,
     this.compact = false,
+    this.showBorder = true,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DpdHeadwordCard> createState() => _DpdHeadwordCardState();
+}
+
+class _DpdHeadwordCardState extends ConsumerState<DpdHeadwordCard> {
+  // Collapsed by default: the card shows the headword + a short meaning
+  // preview; tapping the headword expands the full detail.
+  bool _expanded = false;
+
+  @override
+  void didUpdateWidget(covariant DpdHeadwordCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // New word → collapsed by default.
+    if (oldWidget.lemma != widget.lemma) _expanded = false;
+  }
+
+  /// Strip <details>/<summary> HTML so flutter_html doesn't render its own
+  /// expand/collapse chevrons — we handle that at the lemma heading level.
+  String _stripDetailsTags(String html) {
+    return html
+        .replaceAll(RegExp(r'<details[^>]*>'), '')
+        .replaceAll(RegExp(r'</details>'), '')
+        .replaceAll(RegExp(r'<summary[^>]*>'), '')
+        .replaceAll(RegExp(r'</summary>'), '');
+  }
+
+  /// The short meaning shown in the collapsed state: the first
+  /// `summary` gloss of the DPD entry (e.g. "free from desire"), or the
+  /// whole entry stripped to plain text when there is no `summary` tag.
+  /// Rendered as plain text (cheaper than another flutter_html parse per
+  /// card) and clipped to a couple of lines by the caller.
+  String _shortMeaning(String html) {
+    final summaryMatch = RegExp(
+      r'<summary[^>]*>(.*?)</summary>',
+      dotAll: true,
+    ).firstMatch(html);
+    final text = summaryMatch != null ? summaryMatch.group(1)! : html;
+    return stripHtmlToPlainText(text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final pali = settings.typography.pali;
     final paliFontFamily = pali.fontFamily.fontFamily;
     // The dictionary uses a slightly smaller type scale than the reader.
     final baseSize = (pali.fontSize * 0.8).clamp(13.0, 26.0);
-    final lemmaSize = compact ? (baseSize * 0.9).clamp(12.0, 22.0) : baseSize;
-    final meaningSize = compact
+    final lemmaSize = widget.compact
+        ? (baseSize * 0.9).clamp(12.0, 22.0)
+        : baseSize;
+    final meaningSize = widget.compact
         ? (baseSize * 0.85).clamp(11.0, 20.0)
         : baseSize;
 
+    final hasMeaning =
+        widget.meaningHtml != null && widget.meaningHtml!.isNotEmpty;
+    final colors = widget.colors;
+
     return Material(
-      // Use Material (not a Container+DecoratedBox) for the card background so
-      // that any ListTile rendered inside the HTML (e.g. <details>/<summary>)
-      // finds a Material ancestor and doesn't trigger Flutter's
-      // "ListTile background color or ink splashes may be invisible" assertion.
-      color: colors.surfaceContainerLow,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.5)),
-      ),
-      child: Container(
-        width: double.infinity,
-        margin: const EdgeInsets.only(bottom: 4),
-        padding: EdgeInsets.all(compact ? 4 : 6),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              lemma,
-              style: TextStyle(
-                fontSize: lemmaSize,
-                height: pali.lineHeight * 0.9,
-                fontWeight: FontWeight.w600,
-                // color: colors.primary,
-                fontFamily: paliFontFamily,
-              ),
-            ),
-            if (meaningHtml != null && meaningHtml!.isNotEmpty)
-              DpdHtmlRichText(
-                html: meaningHtml!,
-                baseStyle: TextStyle(
-                  fontSize: meaningSize,
-                  height: pali.lineHeight,
-                  color: colors.onSurface,
-                  fontFamily: paliFontFamily,
+      color: Colors.transparent,
+      child: GestureDetector(
+        onTap: hasMeaning ? () => setState(() => _expanded = !_expanded) : null,
+        child: Container(
+          width: double.infinity,
+          margin: const EdgeInsets.only(bottom: AppDimensions.sm),
+          padding: EdgeInsets.zero,
+          decoration: widget.showBorder
+              ? BoxDecoration(
+                  border: Border.all(
+                    color: colors.outlineVariant.withValues(alpha: 0.55),
+                  ),
+                  borderRadius: BorderRadius.circular(
+                    AppDimensions.radiusMd,
+                  ),
+                )
+              : null,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Lemma heading — tappable to expand/collapse meaning.
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
                 ),
-                linkColor: colors.primary,
-              )
-            else
-              const SizedBox.shrink(),
-          ],
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        widget.lemma,
+                        style: TextStyle(
+                          fontSize: lemmaSize,
+                          height: pali.lineHeight * 0.9,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: paliFontFamily,
+                        ),
+                      ),
+                    ),
+                    if (hasMeaning)
+                      Icon(
+                        _expanded
+                            ? Icons.keyboard_arrow_up
+                            : Icons.keyboard_arrow_down,
+                        size: 20,
+                        color: colors.onSurfaceVariant,
+                      ),
+                  ],
+                ),
+              ),
+              // Short meaning preview — shown only when collapsed.
+              if (hasMeaning && !_expanded)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                  child: Text(
+                    _shortMeaning(widget.meaningHtml!),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: meaningSize * 0.95,
+                      height: pali.lineHeight * 0.95,
+                      color: colors.onSurfaceVariant,
+                      fontFamily: paliFontFamily,
+                    ),
+                  ),
+                ),
+              // Detail meaning — shown only when expanded.
+              if (hasMeaning && _expanded)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                  child: DpdHtmlRichText(
+                    html: _stripDetailsTags(widget.meaningHtml!),
+                    baseStyle: TextStyle(
+                      fontSize: meaningSize,
+                      height: pali.lineHeight,
+                      color: colors.onSurface,
+                      fontFamily: paliFontFamily,
+                    ),
+                    linkColor: colors.primary,
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -284,11 +385,12 @@ class DpdHeadwordCard extends ConsumerWidget {
 // ── Dictionary definition section ──────────────────────────────────────────
 
 /// Shows definitions from a specific dictionary book (not DPD).
-class DictDefinitionSection extends ConsumerWidget {
+class DictDefinitionSection extends ConsumerStatefulWidget {
   final int bookId;
   final String bookName;
   final String searchWord;
   final ColorScheme colors;
+  final bool compact;
 
   const DictDefinitionSection({
     super.key,
@@ -296,10 +398,26 @@ class DictDefinitionSection extends ConsumerWidget {
     required this.bookName,
     required this.searchWord,
     required this.colors,
+    this.compact = false,
   });
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<DictDefinitionSection> createState() =>
+      _DictDefinitionSectionState();
+}
+
+class _DictDefinitionSectionState extends ConsumerState<DictDefinitionSection> {
+  bool _expanded = true;
+
+  @override
+  void didUpdateWidget(covariant DictDefinitionSection oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.searchWord != widget.searchWord) _expanded = true;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ref = this.ref;
     final settings = ref.watch(settingsProvider);
     final typo = settings.typography.typographyFor(
       settings.primaryTranslationLang,
@@ -308,15 +426,16 @@ class DictDefinitionSection extends ConsumerWidget {
     final defFontSize = (typo.fontSize * 0.8).clamp(12.0, 24.0);
     final defLineHeight = typo.lineHeight;
 
-    final key = DictLookupKey(bookId, searchWord);
+    final key = DictLookupKey(widget.bookId, widget.searchWord);
     final defsAsync = ref.watch(dictionaryDefinitionProvider(key));
+    final colors = widget.colors;
 
     Widget header() => Row(
       children: [
         Icon(Icons.book, size: 12, color: colors.onSurfaceVariant),
         const SizedBox(width: 4),
         Text(
-          bookName,
+          widget.bookName,
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
@@ -326,68 +445,97 @@ class DictDefinitionSection extends ConsumerWidget {
       ],
     );
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppDimensions.marginMobile,
-        AppDimensions.sm,
-        AppDimensions.marginMobile,
-        0,
+    return defsAsync.when(
+      // While loading, show the header + a small spinner.
+      loading: () => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          header(),
+          const SizedBox(height: 4),
+          const SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+        ],
       ),
-      child: defsAsync.when(
-        // While loading, show the header + a small spinner.
-        loading: () => Column(
+      // No record for this word in this dictionary → hide entirely
+      // (no header, no "No entry found" text).
+      error: (_, _) => const SizedBox.shrink(),
+      data: (definitions) {
+        if (definitions.isEmpty) return const SizedBox.shrink();
+        final content = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            header(),
-            const SizedBox(height: 4),
-            const SizedBox(
-              width: 16,
-              height: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
+            InkWell(
+              onTap: () => setState(() => _expanded = !_expanded),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppDimensions.sm,
+                  vertical: AppDimensions.xs,
+                ),
+                child: Row(
+                  children: [
+                    Expanded(child: header()),
+                    Icon(
+                      _expanded ? Icons.expand_less : Icons.expand_more,
+                      size: 18,
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
-        ),
-        // No record for this word in this dictionary → hide entirely
-        // (no header, no "No entry found" text).
-        error: (_, _) => const SizedBox.shrink(),
-        data: (definitions) {
-          if (definitions.isEmpty) return const SizedBox.shrink();
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              header(),
-              const SizedBox(height: 4),
-              ...definitions.map((def) {
-                final definition = def['definition'] as String? ?? '';
-                final plain = stripHtmlToPlainText(definition);
-                return Material(
-                  color: colors.surfaceContainerLow,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),
-                    side: BorderSide(
-                      color: colors.outlineVariant.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: Container(
-                    width: double.infinity,
-                    margin: const EdgeInsets.only(bottom: 4),
-                    padding: const EdgeInsets.all(6),
-                    child: Text(
-                      plain,
-                      style: TextStyle(
-                        fontSize: defFontSize,
-                        height: defLineHeight,
-                        color: colors.onSurface,
-                        fontFamily: defFontFamily,
+            if (_expanded)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(
+                  AppDimensions.xs,
+                  2,
+                  AppDimensions.xs,
+                  AppDimensions.xs,
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: definitions.map((def) {
+                    final definition = def['definition'] as String? ?? '';
+                    final plain = stripHtmlToPlainText(definition);
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(
+                        plain,
+                        style: TextStyle(
+                          fontSize: defFontSize,
+                          height: defLineHeight,
+                          color: colors.onSurface,
+                          fontFamily: defFontFamily,
+                        ),
                       ),
-                    ),
-                  ),
-                );
-              }),
-            ],
+                    );
+                  }).toList(),
+                ),
+              ),
+          ],
+        );
+
+        if (widget.compact) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: AppDimensions.xs),
+            child: content,
           );
-        },
-      ),
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: AppDimensions.sm),
+          decoration: BoxDecoration(
+            border: Border.all(
+              color: colors.outlineVariant.withValues(alpha: 0.55),
+            ),
+            borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+          ),
+          child: content,
+        );
+      },
     );
   }
 }

@@ -97,6 +97,61 @@ enum WordLookupGesture {
   disabled,
 }
 
+/// UI font family choices for the app interface (labels, menus, buttons).
+///
+/// These fonts apply to the overall UI chrome, not the reading content
+/// (Pāli/translations have their own separate font settings).
+enum UiFontFamily {
+  system('system', 'System Default'),
+  inter('inter', 'Inter'),
+  roboto('roboto', 'Roboto'),
+  openSans('openSans', 'Open Sans'),
+  notoSans('notoSans', 'Noto Sans'),
+  notoSerif('notoSerif', 'Noto Serif'),
+  georgia('georgia', 'Georgia'),
+  serif('serif', 'Serif'),
+  sansSerif('sans', 'Sans-Serif'),
+  mono('mono', 'Monospace');
+
+  final String code;
+  final String label;
+
+  const UiFontFamily(this.code, this.label);
+
+  /// Returns the Flutter fontFamily string.
+  String get fontFamily {
+    switch (this) {
+      case UiFontFamily.system:
+        return 'Roboto'; // Flutter's default sans-serif
+      case UiFontFamily.inter:
+        return 'Inter'; // Uses system sans-serif if Inter not bundled
+      case UiFontFamily.roboto:
+        return 'Roboto';
+      case UiFontFamily.openSans:
+        return 'OpenSans';
+      case UiFontFamily.notoSans:
+        return 'NotoSans';
+      case UiFontFamily.notoSerif:
+        return 'NotoSerif';
+      case UiFontFamily.georgia:
+        return 'Georgia';
+      case UiFontFamily.serif:
+        return 'serif';
+      case UiFontFamily.sansSerif:
+        return 'sans-serif';
+      case UiFontFamily.mono:
+        return 'monospace';
+    }
+  }
+
+  static UiFontFamily fromCode(String code) {
+    return UiFontFamily.values.firstWhere(
+      (f) => f.code == code,
+      orElse: () => UiFontFamily.system,
+    );
+  }
+}
+
 /// Font family choices for reading.
 enum ReadingFontFamily {
   serif('serif', 'Serif'),
@@ -214,6 +269,33 @@ class LanguageTypography {
       color: effectiveColor(fallbackColor),
     );
   }
+
+  /// Value equality: two typographies that render identically compare
+  /// equal. Needed by the reader's per-paragraph rebuild memoization,
+  /// where typography instances are compared across rebuilds.
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is LanguageTypography &&
+        other.fontSize == fontSize &&
+        other.lineHeight == lineHeight &&
+        other.fontFamily == fontFamily &&
+        other.bold == bold &&
+        other.italic == italic &&
+        other.underline == underline &&
+        other.color == color;
+  }
+
+  @override
+  int get hashCode => Object.hash(
+    fontSize,
+    lineHeight,
+    fontFamily,
+    bold,
+    italic,
+    underline,
+    color,
+  );
 }
 
 /// Default Pali typography.
@@ -350,6 +432,7 @@ class AppSettings {
 
   final TranslationDisplayMode translationDisplayMode;
   final TypographySettings typography;
+  final UiFontFamily uiFontFamily;
   final Color accentColor;
 
   /// Pāli text color pair (light + dark mode).
@@ -388,6 +471,7 @@ class AppSettings {
   final bool keepScreenOn;
   final double autoScrollSpeed;
   final String ttsEngine;
+
   /// Voice for translation lines (system TTS only).
   final String ttsVoice;
 
@@ -512,6 +596,7 @@ class AppSettings {
     this.enabledTranslations = const [],
     this.translationDisplayMode = TranslationDisplayMode.lineByLine,
     this.typography = const TypographySettings(),
+    this.uiFontFamily = UiFontFamily.system,
     this.accentColor = AppColors.accentSaffron,
     this.paliColorPair = ColorPair.pali,
     this.translationColorPair = ColorPair.translation,
@@ -562,6 +647,7 @@ class AppSettings {
     List<String>? enabledTranslations,
     TranslationDisplayMode? translationDisplayMode,
     TypographySettings? typography,
+    UiFontFamily? uiFontFamily,
     Color? accentColor,
     ColorPair? paliColorPair,
     ColorPair? translationColorPair,
@@ -614,6 +700,7 @@ class AppSettings {
       translationDisplayMode:
           translationDisplayMode ?? this.translationDisplayMode,
       typography: typography ?? this.typography,
+      uiFontFamily: uiFontFamily ?? this.uiFontFamily,
       accentColor: accentColor ?? this.accentColor,
       paliColorPair: paliColorPair ?? this.paliColorPair,
       translationColorPair: translationColorPair ?? this.translationColorPair,
@@ -911,6 +998,9 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         pali: _loadPaliTypography(),
         languageOverrides: _loadLanguageOverrides(),
       ),
+      uiFontFamily: UiFontFamily.fromCode(
+        prefs.getString('ui_font_family') ?? 'system',
+      ),
       accentColor: readColor('accent_color', AppColors.accentSaffron),
       paliColorPair: _loadColorPair(
         'pali_color_pair',
@@ -982,6 +1072,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> setThemePreference(ThemePreference pref) async {
     state = state.copyWith(themePreference: pref);
     await _prefs?.setInt('theme_preference', pref.index);
+  }
+
+  Future<void> setUiFontFamily(UiFontFamily font) async {
+    state = state.copyWith(uiFontFamily: font);
+    await _prefs?.setString('ui_font_family', font.code);
   }
 
   Future<void> setPrimaryTranslationLang(String lang) async {

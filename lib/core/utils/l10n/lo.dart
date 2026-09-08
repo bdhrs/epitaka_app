@@ -46,6 +46,7 @@ const Map<String, String> lo = {
   'Pali (Roman script)': 'ບາລີ (ອັກສອນໂຣມັນ)',
   'Drag to reorder enabled translations. The first one is shown when multiple are enabled.':
       'ລາກເພື່ອຈັດລຳດັບການແປທີ່ເປີດໃຊ້. ອັນທຳອິດຈະຖືກສະແດງເມື່ອເປີດໃຊ້ຫຼາຍກວ່າໜຶ່ງ.',
+  'Drag to reorder': 'ລາກເພື່ອຈັດລຳດັບ',
   'No translations downloaded yet. Download a translation above to reorder it.':
       'ຍັງບໍ່ໄດ້ດາວໂຫລດການແປ. ດາວໂຫລດການແປຂ້າງເທິງເພື່ອຈັດລຳດັບ.',
   'No translations found or available for download.':

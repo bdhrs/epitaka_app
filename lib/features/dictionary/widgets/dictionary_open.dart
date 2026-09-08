@@ -24,11 +24,18 @@ import 'dictionary_sheet.dart';
 /// When [closeSheet] is true (used from modal preview sheets), the current
 /// route is popped first so the opened dictionary isn't hidden behind the
 /// sheet.
+///
+/// When [forceSheet] is true, the lookup is always presented as a modal
+/// bottom sheet stacked ON TOP of the current route (the desktop dock panel
+/// is skipped). Used for lookups launched from inside a preview/book-link
+/// sheet: the dictionary overlays the sheet, and closing it returns to the
+/// content underneath (e.g. the commentary the user was reading).
 bool openDictionaryInPanel(
   BuildContext context,
   WidgetRef ref,
   String word, {
   bool closeSheet = false,
+  bool forceSheet = false,
 }) {
   final trimmed = word.trim();
   if (trimmed.isEmpty) return true;
@@ -37,15 +44,17 @@ bool openDictionaryInPanel(
     Navigator.of(context).pop();
   }
 
-  if (ResponsiveBreakpoint.isDesktop(context)) {
+  if (!forceSheet && ResponsiveBreakpoint.isDesktop(context)) {
     // Desktop: docked sidebar panel / right column. Decided by the ACTUAL
     // layout (not just the OS): a desktop window narrowed below the
     // desktop breakpoint falls back to the phone UI, and the docked panel
     // isn't rendered there — so the modal bottom sheet is used instead.
     final notifier = ref.read(sidePanelProvider.notifier);
     final sidePanels = ref.read(sidePanelProvider);
-    if (sidePanels.left.openPanel == SidePanelType.dictionary) {
-      // Already visible — just point it at the new word.
+    if (sidePanels.isDictionaryOpen) {
+      // Already visible — just point it at the new word. Keep this tolerant
+      // of either sidebar slot so a resize or side switch cannot strand the
+      // lookup in the wrong panel.
       notifier.updateDictionaryWord(trimmed);
     } else {
       // Open it; the shell (sidebar dock / right column) decides the exact
@@ -53,8 +62,8 @@ bool openDictionaryInPanel(
       notifier.open(SidePanelType.dictionary, data: trimmed, pin: true);
     }
   } else {
-    // Mobile: modal bottom sheet — back button, pull down, or tap outside
-    // to close.
+    // Mobile (or forced from inside a modal sheet): modal bottom sheet —
+    // back button, pull down, or tap outside to close.
     showDictionarySheet(context, trimmed);
   }
   return true;

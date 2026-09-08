@@ -49,6 +49,7 @@ const Map<String, String> vi = {
   'Pali (Roman script)': 'Pali (chữ La-tinh)',
   'Drag to reorder enabled translations. The first one is shown when multiple are enabled.':
       'Kéo để sắp xếp các bản dịch đã bật. Bản dịch đầu tiên được hiển thị khi có nhiều bản được bật.',
+  'Drag to reorder': 'Kéo để sắp xếp thứ tự',
   'No translations downloaded yet. Download a translation above to reorder it.':
       'Chưa tải bản dịch nào. Tải bản dịch ở trên để sắp xếp.',
   'No translations found or available for download.':

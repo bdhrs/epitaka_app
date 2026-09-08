@@ -36,47 +36,54 @@ class AppTheme {
     }
   }
 
-  /// Build the light („Tālapatta“) theme, optionally seeded from [accentColor].
+  /// Build the light ("Dhamma") theme with a clean white reading surface.
   static ThemeData light({Color? accentColor}) => _themed(
-        base: AppColors.lightColorScheme(),
-        accentColor: accentColor,
-        radius: AppDimensions.radiusXl,
-      );
+    base: AppColors.lightColorScheme().copyWith(
+      surface: Colors.white,
+      surfaceContainerLowest: Colors.white,
+      surfaceContainerLow: const Color(0xFFFAFAFA),
+      surfaceContainer: const Color(0xFFF7F7F7),
+      surfaceContainerHigh: const Color(0xFFF1F1F1),
+      surfaceContainerHighest: const Color(0xFFEAEAEA),
+    ),
+    accentColor: accentColor,
+    radius: AppDimensions.radiusXl,
+  );
 
   /// Build the dark („Samādhi“) theme, optionally seeded from [accentColor].
   static ThemeData dark({Color? accentColor}) => _themed(
-        base: AppColors.darkColorScheme(),
-        accentColor: accentColor,
-        radius: AppDimensions.radiusXl,
-      );
+    base: AppColors.darkColorScheme(),
+    accentColor: accentColor,
+    radius: AppDimensions.radiusXl,
+  );
 
   /// Build the sepia („Paññā-āloka“) light theme — soft, rounded surfaces.
   static ThemeData sepia({Color? accentColor}) => _themed(
-        base: AppColors.sepiaColorScheme(),
-        accentColor: accentColor,
-        radius: 20,
-      );
+    base: AppColors.sepiaColorScheme(),
+    accentColor: accentColor,
+    radius: 20,
+  );
 
   /// Build the ocean („Vimutti-rasa“) light theme — crisper, modern corners.
   static ThemeData ocean({Color? accentColor}) => _themed(
-        base: AppColors.oceanColorScheme(),
-        accentColor: accentColor,
-        radius: 12,
-      );
+    base: AppColors.oceanColorScheme(),
+    accentColor: accentColor,
+    radius: 12,
+  );
 
   /// Build the midnight („Passaddhi“) dark theme — sharp, focused corners.
   static ThemeData midnight({Color? accentColor}) => _themed(
-        base: AppColors.midnightColorScheme(),
-        accentColor: accentColor,
-        radius: 10,
-      );
+    base: AppColors.midnightColorScheme(),
+    accentColor: accentColor,
+    radius: 10,
+  );
 
   /// Build the forest („Arañña“) dark theme — rounded, organic surfaces.
   static ThemeData forest({Color? accentColor}) => _themed(
-        base: AppColors.forestColorScheme(),
-        accentColor: accentColor,
-        radius: 20,
-      );
+    base: AppColors.forestColorScheme(),
+    accentColor: accentColor,
+    radius: 20,
+  );
 
   /// Build a theme from a fixed base palette, optionally seeding accent colors.
   ///
@@ -142,18 +149,14 @@ class AppTheme {
 
       // ── Text Theme ──────────────────────────────────────────────────
       textTheme: TextTheme(
-        displayLarge: AppTypography.displayPali.copyWith(
-          color: colors.primary,
-        ),
+        displayLarge: AppTypography.displayPali.copyWith(color: colors.primary),
         headlineLarge: AppTypography.headlineLarge.copyWith(
           color: colors.onSurface,
         ),
         headlineSmall: AppTypography.headlineSmall.copyWith(
           color: colors.onSurface,
         ),
-        bodyLarge: AppTypography.bodyPali.copyWith(
-          color: colors.onSurface,
-        ),
+        bodyLarge: AppTypography.bodyPali.copyWith(color: colors.onSurface),
         bodyMedium: AppTypography.bodyTranslation.copyWith(
           color: colors.onSurfaceVariant,
         ),
@@ -197,9 +200,7 @@ class AppTheme {
         backgroundColor: colors.surface,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            top: Radius.circular(radius + 4),
-          ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(radius + 4)),
         ),
       ),
 

@@ -383,7 +383,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
     final normalized = query.trim();
     // A query made only of punctuation (",", "…") has no searchable words
     // after cleaning — treat it like an empty query instead of running a
-    // pointless (and, for headings, `LIKE '%%'`-matching) search.
+    // pointless search.
     if (normalized.isEmpty || cleanPaliForIndexing(normalized).isEmpty) {
       state = const SearchIdle();
       return;
@@ -970,57 +970,114 @@ class SearchNotifier extends StateNotifier<SearchState> {
     }
   }
 
-  /// Search the headings table for matching titles.
+  /// A cached heading row with its [normalizePaliFuzzy]-normalised title
+  /// precomputed, so heading search scans the full list in memory without
+  /// re-normalising on every keystroke. The headings table is static per
+  /// database file, so the cache is safe for a whole session (invalidated
+  /// in [clear]).
+  List<({String bookId, int paraId, int? level, String title, String key})>?
+      _cachedHeadings;
+
+  /// Diacritic-insensitive heading search.
+  ///
+  /// The headings table stores Pāḷi titles with diacritics (e.g.
+  /// "Sammādiṭṭhisuttaṃ"), and SQLite's `LIKE` compares them byte-for-byte,
+  /// so a plain "sammaditthi" query could never match a title that carries
+  /// diacritics — unlike the FTS5 content search, whose `remove_diacritics 1`
+  /// tokenizer makes diacritics irrelevant. Matching is therefore done here:
+  /// every heading title is normalised with the same [normalizePaliFuzzy]
+  /// pipeline used for search terms, and a heading matches when every query
+  /// word (also normalised) occurs inside it.
   Future<List<HeadingResult>> _searchHeadings(
     EpitakaDatabase epitakaDb,
     String normalized,
     Map<String, BookInfo> bookMap,
   ) async {
     try {
-      // Clean punctuation (commas, quotes, …) out of pasted sentences the
-      // same way the FTS query is cleaned, so the LIKE pattern matches
-      // heading titles. Diacritics are preserved (LIKE matches them as-is).
+      // Clean punctuation the same way the FTS query is cleaned, then split
+      // into words — each word must occur somewhere in the heading title.
       final cleaned = cleanPaliForIndexing(normalized);
-      // Never build a `LIKE '%%'` pattern (would match every heading).
       if (cleaned.isEmpty) return [];
-      final likePattern = '%$cleaned%';
-      final rows = await epitakaDb.customSelect(
-        'SELECT book_id, para_id, title, level '
-        'FROM headings '
-        'WHERE title LIKE ? '
-        'ORDER BY book_id, para_id '
-        'LIMIT 10',
-        variables: [Variable.withString(likePattern)],
-      ).get();
+      final words = normalizePaliFuzzy(cleaned)
+          .split(RegExp(r'\s+'))
+          .where((w) => w.isNotEmpty)
+          .toList();
+      if (words.isEmpty) return [];
+
+      final headings = await _allHeadings(epitakaDb);
+      if (headings.isEmpty) return [];
 
       final results = <HeadingResult>[];
       final seen = <String>{};
-      for (final row in rows) {
-        final bookId = row.data['book_id'] as String;
-        final paraId = row.data['para_id'] as int;
-        final title = (row.data['title'] as String?) ?? '';
-        final level = row.data['level'] as int?;
+      for (final h in headings) {
+        if (h.key.isEmpty) continue;
+        var matches = true;
+        for (final word in words) {
+          if (!h.key.contains(word)) {
+            matches = false;
+            break;
+          }
+        }
+        if (!matches) continue;
 
         // Deduplicate by book_id + title to avoid showing the same
         // heading multiple times (e.g. when multiple para_ids match).
-        final key = '$bookId:$title';
+        final key = '${h.bookId}:${h.title}';
         if (seen.contains(key)) continue;
         seen.add(key);
 
-        final book = bookMap[bookId];
+        final book = bookMap[h.bookId];
         results.add(HeadingResult(
-          bookId: bookId,
-          paraId: paraId,
-          title: title,
-          level: level,
+          bookId: h.bookId,
+          paraId: h.paraId,
+          title: h.title,
+          level: h.level,
           bookName: book?.bookName,
         ));
+        if (results.length >= 10) break;
       }
       return results;
     } catch (e) {
       debugPrint('[SEARCH] Headings search failed: $e');
       return [];
     }
+  }
+
+  /// Load every row of the `headings` table once, caching it in memory so
+  /// repeated searches don't re-query the database.
+  Future<List<({String bookId, int paraId, int? level, String title, String key})>>
+      _allHeadings(EpitakaDatabase epitakaDb) async {
+    final cached = _cachedHeadings;
+    if (cached != null) return cached;
+
+    // Skip `level = 10` rows: those are pure numeric section markers
+    // (122k of them in the real corpus — "1", "2", …), not titles a user
+    // would search for, and they'd flood the results. The app's section
+    // logic (`level < 10`) uses the same rule to identify real titles.
+    final rows = await epitakaDb.customSelect(
+      'SELECT book_id, para_id, title, level '
+      'FROM headings '
+      'WHERE level IS NULL OR level < 10 '
+      'ORDER BY book_id, para_id',
+    ).get();
+
+    final headings =
+        <({String bookId, int paraId, int? level, String title, String key})>[
+          for (final row in rows)
+            (
+              bookId: row.data['book_id'] as String,
+              paraId: row.data['para_id'] as int,
+              title: (row.data['title'] as String?) ?? '',
+              level: row.data['level'] as int?,
+              key: normalizePaliFuzzy((row.data['title'] as String?) ?? ''),
+            ),
+        ];
+    // Don't cache an empty result — a concurrent database swap may have
+    // raced this query; an empty cache would poison every later search.
+    if (headings.isNotEmpty) {
+      _cachedHeadings = headings;
+    }
+    return headings;
   }
 
   /// Get suggestions for autocomplete.
@@ -1042,6 +1099,7 @@ class SearchNotifier extends StateNotifier<SearchState> {
   void clear() {
     _debounce?.cancel();
     _cachedAllBooks = null;
+    _cachedHeadings = null;
     _enabledCategories = {...kAllCategories};
     _enabledNikayas = {...kAllNikayas};
     state = const SearchIdle();

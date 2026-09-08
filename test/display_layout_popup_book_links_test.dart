@@ -350,4 +350,69 @@ void main() {
     expect(notifier.state.enabledTranslations, contains('my'));
     expect(notifier.state.enabledTranslations, contains('my_nissaya'));
   });
+
+  testWidgets('popup lets you drag an enabled translation to reorder it', (
+    tester,
+  ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
+    final notifier = SettingsNotifier(null);
+    notifier.state = const AppSettings(
+      showBookLinks: true,
+      enabledTranslations: ['en', 'my'],
+    );
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith((ref) => notifier),
+          ...baseOverrides(
+            versions: const [
+              TranslationVersion(
+                languageCode: 'en',
+                filename: 'epitaka_en.db',
+                isAvailable: true,
+                displayName: 'Default',
+              ),
+              TranslationVersion(
+                languageCode: 'my',
+                filename: 'epitaka_my.db',
+                isAvailable: true,
+                displayName: 'Default',
+              ),
+            ],
+          ),
+        ],
+        child: MaterialApp(
+          supportedLocales: AppLocalizationsDelegate.supportedLocales,
+          localizationsDelegates: const [AppLocalizationsDelegate()],
+          theme: ThemeData(
+            useMaterial3: true,
+            splashFactory: InkSplash.splashFactory,
+          ),
+          home: const Scaffold(body: DisplayLayoutPopup()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    // Both rows are enabled, so both show a drag handle.
+    expect(find.byIcon(Icons.drag_indicator), findsNWidgets(2));
+
+    // Drag the second row ('my') up above the first ('en').
+    await tester.timedDrag(
+      find.byIcon(Icons.drag_indicator).at(1),
+      const Offset(0, -80),
+      const Duration(milliseconds: 300),
+    );
+    await tester.pumpAndSettle();
+
+    // The new order is persisted to the shared enabledTranslations list,
+    // which is the same list the Settings screen reorders.
+    expect(notifier.state.enabledTranslations, ['my', 'en']);
+  });
 }

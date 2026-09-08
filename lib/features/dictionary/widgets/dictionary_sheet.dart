@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:epitaka/core/utils/responsive_breakpoint.dart'
     show ResponsiveBreakpoint;
 import 'package:epitaka/shared/providers/side_panel_provider.dart';
+import 'package:epitaka/shared/widgets/wide_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -49,6 +50,8 @@ Future<T?> showDictionarySheet<T>(BuildContext context, String word) {
     // disable the modal's own drag-to-dismiss to avoid the elastic
     // rubber-band effect (especially noticeable on Android).
     enableDrag: false,
+    // Wide screens: span 80% of the app instead of the 640 px default cap.
+    constraints: wideBottomSheetConstraints(context),
     builder: (_) => DictionarySheet(initialWord: word),
   ).whenComplete(() {
     container.read(dictionarySheetOpenProvider.notifier).state--;
@@ -1074,9 +1077,22 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
     final settings = ref.watch(settingsProvider);
     final pali = settings.typography.pali;
     final paliFontFamily = pali.fontFamily.fontFamily;
-    return Padding(
-      padding: EdgeInsetsGeometry.all(10),
-      child: Column(
+    return Container(
+      margin: const EdgeInsets.fromLTRB(
+        AppDimensions.marginMobile,
+        0,
+        AppDimensions.marginMobile,
+        0,
+      ),
+      decoration: BoxDecoration(
+        border: Border.all(
+          color: colors.outlineVariant.withValues(alpha: 0.55),
+        ),
+        borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
+      ),
+      child: Padding(
+        padding: EdgeInsetsGeometry.all(10),
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Section label
@@ -1128,11 +1144,9 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
               );
             }),
           const SizedBox(height: 8),
-
-          const Divider(height: 1),
-          const SizedBox(height: AppDimensions.sm),
         ],
       ),
+    ),
     );
   }
 

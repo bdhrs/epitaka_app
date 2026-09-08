@@ -46,6 +46,7 @@ const Map<String, String> si = {
   'Pali (Roman script)': 'පාලි (රෝම අක්ෂර)',
   'Drag to reorder enabled translations. The first one is shown when multiple are enabled.':
       'සක්‍රීය කළ පරිවර්තන නැවත සකස් කිරීමට ඇදගෙන යන්න. එකකට වඩා සක්‍රීය කළ විට පළමුවැන්න පෙන්වයි.',
+  'Drag to reorder': 'ඇදගෙන ගොස් අනුපිළිවෙල වෙනස් කරන්න',
   'No translations downloaded yet. Download a translation above to reorder it.':
       'තවම පරිවර්තන බාගෙන නැත. නැවත සකස් කිරීමට ඉහත පරිවර්තනයක් බාගන්න.',
   'No translations found or available for download.':

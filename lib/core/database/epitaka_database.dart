@@ -1,6 +1,10 @@
+import 'dart:async';
 import 'dart:io';
+import 'dart:isolate';
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:sqlite3/sqlite3.dart' as sqlite;
 
 import 'drift_database_executor.dart';
 
@@ -137,6 +141,55 @@ class EpitakaDatabase extends _$EpitakaDatabase {
       },
     );
 
+    // Ensure supporting indexes on epitaka.db in the background. epitaka.db
+    // is a downloaded core asset (replaced on update), so indexes must be
+    // (re)created at runtime rather than baked into the shipped file.
+    unawaited(_ensureDictionaryIndex(dbPath));
+
     return EpitakaDatabase(database);
+  }
+
+  /// Creates `idx_dictionary_word_book ON dictionary(word, book_id)` when it
+  /// is missing, on a background isolate so the UI thread never stalls.
+  ///
+  /// The dictionary sections query `dictionary` per enabled book on every
+  /// lookup (`WHERE word = ? AND book_id = ?`). The table (~570k rows) ships
+  /// WITHOUT an index, so without this SQLite full-scans it per book —
+  /// roughly 150–270 ms each on desktop, and several dictionaries are
+  /// enabled by default, which is the dominant cost when the dictionary
+  /// opens. With the index the same query is ~0.1 ms. Building the index is
+  /// a one-time ~0.8 s cost, done off the UI thread; afterwards the check is
+  /// a trivial sqlite_master probe per open.
+  static Future<void> _ensureDictionaryIndex(String dbPath) async {
+    if (kIsWeb) return;
+    try {
+      await Isolate.run(() {
+        final db = sqlite.sqlite3.open(dbPath);
+        try {
+          // A concurrent writer (settings/annotations writes) may hold the
+          // lock briefly; wait instead of failing outright.
+          db.execute('PRAGMA busy_timeout=5000');
+          final exists = db
+              .select(
+                "SELECT 1 FROM sqlite_master WHERE type = 'index' "
+                "AND name = 'idx_dictionary_word_book' LIMIT 1",
+              )
+              .isNotEmpty;
+          if (!exists) {
+            db.execute(
+              'CREATE INDEX idx_dictionary_word_book '
+              'ON dictionary(word, book_id)',
+            );
+          }
+        } finally {
+          db.dispose();
+        }
+      });
+    } catch (_) {
+      // Never fail the DB open because the optional index could not be
+      // built (read-only file system, replaced file mid-build, …). The
+      // dictionary sections keep working — just slower until the index
+      // exists.
+    }
   }
 }

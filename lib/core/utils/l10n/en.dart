@@ -75,6 +75,7 @@ const Map<String, String> en = {
       'This voice is not installed on your device. Tap "Install voice" to add it.',
   'Drag to reorder enabled translations. The first one is shown when multiple are enabled.':
       'Drag to reorder enabled translations. The first one is shown when multiple are enabled.',
+  'Drag to reorder': 'Drag to reorder',
   'No translations downloaded yet. Download a translation above to reorder it.':
       'No translations downloaded yet. Download a translation above to reorder it.',
   'No translations found or available for download.':

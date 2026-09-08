@@ -189,6 +189,15 @@ class SidePanelNotifier extends StateNotifier<SidePanelsState> {
         left: left.copyWith(panelData: word),
         right: state.right,
       );
+      return;
+    }
+
+    final right = state.right;
+    if (right.openPanel == SidePanelType.dictionary) {
+      state = SidePanelsState(
+        left: state.left,
+        right: right.copyWith(panelData: word),
+      );
     }
   }
 

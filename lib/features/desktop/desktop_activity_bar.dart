@@ -148,20 +148,6 @@ class DesktopActivityBar extends StatelessWidget {
               ),
             ),
           ),
-          // Bottom group stays pinned to the rail.
-          _ActivityBarButton(
-            icon: Icons.restart_alt,
-            tooltip: loc.resetLayout,
-            active: false,
-            onTap: onResetLayout,
-          ),
-          _ActivityBarButton(
-            icon: Icons.settings_outlined,
-            tooltip: AppShortcuts.tooltip(loc.settings, 'settings'),
-            active: false,
-            onTap: onOpenSettings,
-          ),
-          const SizedBox(height: 6),
         ],
       ),
     );
@@ -219,8 +205,8 @@ class _ActivityBarButtonState extends State<_ActivityBarButton> {
     final color = widget.active
         ? colors.primary
         : _hovered
-            ? colors.onSurface
-            : colors.onSurfaceVariant;
+        ? colors.onSurface
+        : colors.onSurfaceVariant;
 
     return Tooltip(
       message: widget.tooltip,

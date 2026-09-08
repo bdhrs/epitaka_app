@@ -208,8 +208,7 @@ class _ContentsPanelState extends ConsumerState<ContentsPanel> {
 
     return contentsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, stack) =>
-          Center(child: Text(loc.errorMessage('$e'))),
+      error: (e, stack) => Center(child: Text(loc.errorMessage('$e'))),
       data: (headings) {
         final currentIndex = _currentHeadingIndex(headings);
         // Inside panel it's always compact
@@ -276,17 +275,20 @@ class _ContentsPanelState extends ConsumerState<ContentsPanel> {
                         // The outline is the full outline of the book —
                         // every section with its study guide — opened as a
                         // separate reading view.
-                        IconButton(
-                          icon: const Icon(Icons.account_tree_outlined, size: 18),
-                          color: colors.onSurfaceVariant,
-                          tooltip: loc.outline,
-                          onPressed: () {
-                            if (_effectiveBookId.isEmpty) return;
-                            context.push(
-                              '/outline/$_effectiveBookId?bookName=${Uri.encodeComponent(_effectiveBookName)}',
-                            );
-                          },
-                        ),
+                        // IconButton(
+                        //   icon: const Icon(
+                        //     Icons.account_tree_outlined,
+                        //     size: 18,
+                        //   ),
+                        //   color: colors.onSurfaceVariant,
+                        //   tooltip: loc.outline,
+                        //   onPressed: () {
+                        //     if (_effectiveBookId.isEmpty) return;
+                        //     context.push(
+                        //       '/outline/$_effectiveBookId?bookName=${Uri.encodeComponent(_effectiveBookName)}',
+                        //     );
+                        //   },
+                        // ),
                         IconButton(
                           icon: Icon(Icons.search, size: 18),
                           color: colors.onSurfaceVariant,
@@ -382,7 +384,10 @@ class _ContentsRow extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final loc = AppLocalizations.of(context);
-    final script = ref.watch(settingsProvider).paliScript;
+    final settings = ref.watch(settingsProvider);
+    final script = settings.paliScript;
+    // Match the reader's Pāli text size so the TOC aligns with the book.
+    final paliFontSize = settings.typography.pali.fontSize;
     return Padding(
       padding: EdgeInsets.only(left: indent * indentUnit),
       child: DecoratedBox(
@@ -420,7 +425,7 @@ class _ContentsRow extends ConsumerWidget {
                     style: AppTypography.labelSmall.copyWith(
                       color: isCurrent ? colors.primary : colors.onSurface,
                       fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w400,
-                      fontSize: 12,
+                      fontSize: paliFontSize * 0.8,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
