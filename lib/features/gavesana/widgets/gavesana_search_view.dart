@@ -5,8 +5,10 @@ import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/utils/velthuis.dart';
+import '../../ai_qa/providers/ai_qa_settings_provider.dart';
 import '../../ai_qa/widgets/ai_qa_settings_sheet.dart';
 import '../../search/providers/search_provider.dart';
+import '../../shared/widgets/ai_error_card.dart';
 import '../../search/widgets/search_results_view.dart';
 import '../providers/ai_search_provider.dart';
 
@@ -504,22 +506,14 @@ class _GavesanaSearchViewState extends ConsumerState<GavesanaSearchView> {
     AppLocalizations loc,
     String message,
   ) {
+    final provider = ref.watch(aiQaSettingsProvider.select((s) => s.provider));
     return Center(
-      child: Padding(
+      child: SingleChildScrollView(
         padding: const EdgeInsets.all(AppDimensions.xl),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.error_outline, size: 48, color: colors.error),
-            const SizedBox(height: AppDimensions.sm),
-            Text(
-              message,
-              textAlign: TextAlign.center,
-              style: AppTypography.bodyTranslation.copyWith(
-                color: colors.error,
-                fontSize: 13,
-              ),
-            ),
+            AiErrorCard(error: message, provider: provider),
             const SizedBox(height: AppDimensions.md),
             FilledButton.tonalIcon(
               onPressed: () => showAiQaSettingsSheet(context),

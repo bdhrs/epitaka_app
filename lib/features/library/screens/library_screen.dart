@@ -169,14 +169,25 @@ class _LibraryAppBar extends StatelessWidget implements PreferredSizeWidget {
         preferredSize: const Size.fromHeight(1),
         child: Divider(height: 1, thickness: 1, color: colors.outlineVariant),
       ),
-      leading: Builder(
-        builder: (context) {
-          return IconButton(
-            icon: const Icon(Icons.menu),
-            color: colors.onSurfaceVariant,
-            onPressed: () => Scaffold.of(context).openDrawer(),
-          );
-        },
+      leadingWidth: 96,
+      leading: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Builder(
+            builder: (context) {
+              return IconButton(
+                icon: const Icon(Icons.menu),
+                color: colors.onSurfaceVariant,
+                onPressed: () => Scaffold.of(context).openDrawer(),
+              );
+            },
+          ),
+          IconButton(
+            icon: Icon(Icons.auto_awesome, color: colors.primary),
+            tooltip: AppLocalizations.of(context).vimamsa,
+            onPressed: () => context.push('/ai-qa'),
+          ),
+        ],
       ),
       title: Text(
         'ePitaka',
@@ -187,11 +198,6 @@ class _LibraryAppBar extends StatelessWidget implements PreferredSizeWidget {
       ),
       centerTitle: true,
       actions: [
-        IconButton(
-          icon: Icon(Icons.auto_awesome, color: colors.primary),
-          tooltip: AppLocalizations.of(context).vimamsa,
-          onPressed: () => context.push('/ai-qa'),
-        ),
         IconButton(
           icon: const Icon(Icons.search),
           color: colors.onSurfaceVariant,
@@ -568,8 +574,12 @@ class _BookmarksTab extends ConsumerWidget {
                         bm.paraId,
                         bm.lineId,
                       ),
-                      onDelete: () =>
-                          _confirmDeleteBookmark(context, ref, bm.id, bm.name ?? ''),
+                      onDelete: () => _confirmDeleteBookmark(
+                        context,
+                        ref,
+                        bm.id,
+                        bm.name ?? '',
+                      ),
                     ),
                   )
                   .toList(),
@@ -788,4 +798,3 @@ class _BookmarkCard extends ConsumerWidget {
     );
   }
 }
-

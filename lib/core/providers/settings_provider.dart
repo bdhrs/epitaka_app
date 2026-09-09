@@ -583,6 +583,10 @@ class AppSettings {
   /// order (drag-to-reorder in Settings → Toolbar).
   final List<ToolbarItem> toolbarItems;
 
+  /// Script/language for Pāli TTS: 'kn' (Kannada), 'te' (Telugu), 'si' (Sinhala),
+  /// 'hi' (Hindi/Sanskrit). Hindi enables Devanagari conversion + replacement.
+  final String ttsScript;
+
   static const Color defaultPaliColor = Color(0xFF7A2E1D);
   static const Color defaultTranslationColor = Color(0xFF33312E);
 
@@ -614,6 +618,7 @@ class AppSettings {
     this.ttsSupertonicQuality = 'medium',
     this.ttsSupertonicDownloaded = false,
     this.ttsSpeakMode = TtsSpeakMode.translation,
+    this.ttsScript = 'hi',
     this.copyQuoteFormat = CopyQuoteFormat.none,
     this.copyDefaultScope = CopyScope.both,
     this.paliScript = Script.roman,
@@ -665,6 +670,7 @@ class AppSettings {
     String? ttsSupertonicQuality,
     bool? ttsSupertonicDownloaded,
     TtsSpeakMode? ttsSpeakMode,
+    String? ttsScript,
     CopyQuoteFormat? copyQuoteFormat,
     CopyScope? copyDefaultScope,
     Script? paliScript,
@@ -720,6 +726,7 @@ class AppSettings {
       ttsSupertonicDownloaded:
           ttsSupertonicDownloaded ?? this.ttsSupertonicDownloaded,
       ttsSpeakMode: ttsSpeakMode ?? this.ttsSpeakMode,
+      ttsScript: ttsScript ?? this.ttsScript,
       copyQuoteFormat: copyQuoteFormat ?? this.copyQuoteFormat,
       copyDefaultScope: copyDefaultScope ?? this.copyDefaultScope,
       paliScript: paliScript ?? this.paliScript,
@@ -1028,6 +1035,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
       ttsSupertonicDownloaded:
           prefs.getBool('tts_supertonic_downloaded') ?? false,
       ttsSpeakMode: _parseTtsSpeakMode(prefs.getString('tts_speak_mode')),
+      ttsScript: prefs.getString('tts_script') ?? 'hi',
       copyQuoteFormat: _parseCopyQuoteFormat(
         prefs.getString('copy_quote_format') ?? 'none',
       ),
@@ -1326,6 +1334,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   Future<void> setTtsSpeakMode(TtsSpeakMode mode) async {
     state = state.copyWith(ttsSpeakMode: mode);
     await _prefs?.setString('tts_speak_mode', mode.name);
+  }
+
+  /// Set the script/language for Pāli TTS (Kannada, Telugu, Sinhala, Hindi).
+  Future<void> setTtsScript(String script) async {
+    state = state.copyWith(ttsScript: script);
+    await _prefs?.setString('tts_script', script);
   }
 
   Future<void> setCopyQuoteFormat(CopyQuoteFormat format) async {

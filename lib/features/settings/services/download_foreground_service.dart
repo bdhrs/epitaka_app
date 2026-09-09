@@ -12,6 +12,8 @@ import 'package:permission_handler/permission_handler.dart';
 ///   * translation database downloads ([DownloadForegroundService.instance]),
 ///   * the on-device Translation Builder run (the runner starts the service
 ///     when a run begins and stops it when the run finishes).
+///   * the FTS search-index build (same pattern: the build runs in the main
+///     isolate, the service only keeps the process alive + shows progress).
 ///
 /// The service itself does no work — the actual job (download stream or AI
 /// translation loop) runs in the main isolate. Starting the foreground
@@ -53,6 +55,9 @@ class DownloadForegroundService {
 
   /// How many translation-builder runs are currently holding the service.
   int _translatorRefCount = 0;
+
+  /// How many search-index builds are currently holding the service.
+  int _indexRefCount = 0;
 
   /// Request the Android 13+ `POST_NOTIFICATIONS` runtime permission.
   ///
@@ -178,27 +183,23 @@ class DownloadForegroundService {
       }
       return true;
     } catch (e) {
-      developer.log(
-        '[DL_FGS] start failed: $e',
-        name: 'epitaka.download',
-      );
+      developer.log('[DL_FGS] start failed: $e', name: 'epitaka.download');
       return false;
     }
   }
 
   /// Stop the service once no owner needs it any more.
   Future<void> _stopWhenIdle() async {
-    if (_downloadRefCount <= 0 && _translatorRefCount <= 0) {
+    if (_downloadRefCount <= 0 &&
+        _translatorRefCount <= 0 &&
+        _indexRefCount <= 0) {
       if (!Platform.isAndroid) return;
       try {
         if (await FlutterForegroundTask.isRunningService) {
           await FlutterForegroundTask.stopService();
         }
       } catch (e) {
-        developer.log(
-          '[DL_FGS] stop failed: $e',
-          name: 'epitaka.download',
-        );
+        developer.log('[DL_FGS] stop failed: $e', name: 'epitaka.download');
       }
     }
   }
@@ -208,10 +209,7 @@ class DownloadForegroundService {
   /// Start (or attach to) the foreground service for a download. Returns
   /// whether the ongoing status-bar notification is active (callers fall
   /// back to a plain local notification when false).
-  Future<bool> showDownload({
-    required String title,
-    String text = '',
-  }) async {
+  Future<bool> showDownload({required String title, String text = ''}) async {
     final active = await _startOrUpdate(title: title, text: text);
     if (active) _downloadRefCount++;
     return active;
@@ -230,10 +228,7 @@ class DownloadForegroundService {
         notificationText: text,
       );
     } catch (e) {
-      developer.log(
-        '[DL_FGS] update failed: $e',
-        name: 'epitaka.download',
-      );
+      developer.log('[DL_FGS] update failed: $e', name: 'epitaka.download');
     }
   }
 
@@ -270,6 +265,32 @@ class DownloadForegroundService {
   /// once no job needs it any more.
   Future<void> hideTranslation() async {
     if (_translatorRefCount > 0) _translatorRefCount--;
+    await _stopWhenIdle();
+  }
+
+  // ── Search-index build owner ────────────────────────────────────────
+
+  /// Start (or attach to) the foreground service for a search-index build.
+  /// Returns whether the ongoing status-bar notification is active (callers
+  /// fall back to a plain local notification when false).
+  Future<bool> showIndex({required String title, String text = ''}) async {
+    final active = await _startOrUpdate(title: title, text: text);
+    if (active) _indexRefCount++;
+    return active;
+  }
+
+  /// Update the index-build notification's progress text.
+  Future<void> updateIndex({
+    required String title,
+    required String text,
+  }) async {
+    await updateDownload(title: title, text: text);
+  }
+
+  /// Detach this index build from the foreground service, stopping it
+  /// once no job needs it any more.
+  Future<void> hideIndex() async {
+    if (_indexRefCount > 0) _indexRefCount--;
     await _stopWhenIdle();
   }
 }

@@ -16,6 +16,7 @@ import '../annotations/widgets/global_annotations_view.dart';
 import '../script_converter/widgets/script_converter_panel.dart';
 import '../library/widgets/history_panel.dart';
 import '../library/widgets/library_panel.dart';
+import '../outline/widgets/outline_panel.dart';
 import '../reader/widgets/reader_keyboard_navigation.dart';
 import '../search/widgets/search_panel.dart';
 import '../settings/widgets/settings_dialog.dart';
@@ -159,6 +160,8 @@ class _DesktopShellState extends ConsumerState<DesktopShell> {
         return loc.scriptConverter;
       case SidePanelType.contents:
         return loc.contents;
+      case SidePanelType.outline:
+        return loc.outline;
       case SidePanelType.gavesana:
         return loc.gavesana;
       case SidePanelType.translator:
@@ -373,6 +376,8 @@ class DesktopSidebar extends StatelessWidget {
         return const ScriptConverterPanel();
       case SidePanelType.contents:
         return const ContentsPanel();
+      case SidePanelType.outline:
+        return const OutlinePanel();
       case SidePanelType.gavesana:
         return GavesanaPanel(autoFocus: autoFocus);
       case SidePanelType.translator:

@@ -922,4 +922,9 @@ const Map<String, String> vi = {
 
   // ── App shell ───────────────────────────────────────────────────────
   'Listen': 'Nghe',
+
+  // ── AI error card ───────────────────────────────────────────────────
+  'Search Google': 'Tìm trên Google',
+  'Show full error': 'Hiện lỗi đầy đủ',
+  'Hide full error': 'Ẩn lỗi đầy đủ',
 };

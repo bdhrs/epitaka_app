@@ -55,6 +55,12 @@ class SectionIndexService {
   /// Guard against concurrent [buildIndex] calls.
   bool _isBuilding = false;
 
+  /// Shared future so concurrent [ensureIndex] callers (e.g. parallel MCP
+  /// tool calls on a cold index) await ONE build instead of each starting
+  /// their own — the old race left the second caller reading a half-built
+  /// index ("flaky after load").
+  Future<void>? _ensureOngoing;
+
   SectionIndexService(this._ref);
 
   // ── Table setup ────────────────────────────────────────────────────────
@@ -114,7 +120,9 @@ class SectionIndexService {
       }
       debugPrint('[SECTIONS] section_summaries empty — auto-building…');
       await buildIndex();
-      debugPrint('[SECTIONS] Auto-build complete: ${await getIndexSize()} sections');
+      debugPrint(
+        '[SECTIONS] Auto-build complete: ${await getIndexSize()} sections',
+      );
     }
   }
 
@@ -122,8 +130,23 @@ class SectionIndexService {
 
   /// Ensure the section index tables exist and are populated, building them
   /// lazily on first use (mention_service-style). Safe to call before every
-  /// search_sections / get_section tool invocation.
+  /// search_sections / get_section tool invocation, including concurrently.
   Future<void> ensureIndex() async {
+    final ongoing = _ensureOngoing;
+    if (ongoing != null) {
+      await ongoing;
+      return;
+    }
+    final future = _ensureInner();
+    _ensureOngoing = future;
+    try {
+      await future;
+    } finally {
+      _ensureOngoing = null;
+    }
+  }
+
+  Future<void> _ensureInner() async {
     final appDb = await _ref.read(appDbProvider.future);
     await _ensureTables(appDb);
   }
@@ -164,9 +187,9 @@ class SectionIndexService {
     debugPrint('[SECTIONS] Building section index…');
     final stopwatch = Stopwatch()..start();
 
-    final books = await epiDb.customSelect(
-      'SELECT book_id, book_name FROM books ORDER BY id',
-    ).get();
+    final books = await epiDb
+        .customSelect('SELECT book_id, book_name FROM books ORDER BY id')
+        .get();
     final totalBooks = books.length;
 
     int inserted = 0;
@@ -182,12 +205,14 @@ class SectionIndexService {
       );
 
       // Filtered headings for this book (same rule as mention_index).
-      final headings = await epiDb.customSelect(
-        'SELECT para_id, title, level, parent FROM headings '
-        'WHERE book_id = ? AND level < 19 AND level != 10 '
-        'ORDER BY para_id ASC',
-        variables: [Variable.withString(bookId)],
-      ).get();
+      final headings = await epiDb
+          .customSelect(
+            'SELECT para_id, title, level, parent FROM headings '
+            'WHERE book_id = ? AND level < 19 AND level != 10 '
+            'ORDER BY para_id ASC',
+            variables: [Variable.withString(bookId)],
+          )
+          .get();
 
       if (headings.isEmpty) {
         // Book with no headings → treat the whole book as one section.
@@ -274,8 +299,12 @@ class SectionIndexService {
       );
 
       // Batched extractive summaries (Pāli + English), one query per book.
-      final paliBodies =
-          await _fetchBodyTexts(epiDb, bookId, sectionRows, column: 'pali');
+      final paliBodies = await _fetchBodyTexts(
+        epiDb,
+        bookId,
+        sectionRows,
+        column: 'pali',
+      );
       final enBodies = enDb == null
           ? <int, String>{}
           : await _fetchBodyTexts(
@@ -359,11 +388,19 @@ class SectionIndexService {
         ? ''
         : await _firstEnTranslation(enDb, bookId, 1);
 
-    final summary = (await _bodyTextFor(epiDb, bookId, 1, lastPara, 'pali')).trim();
+    final summary = (await _bodyTextFor(
+      epiDb,
+      bookId,
+      1,
+      lastPara,
+      'pali',
+    )).trim();
     final summaryEn = enDb == null
         ? ''
         : (await _bodyTextFor(enDb, bookId, 1, lastPara, 'translation')).trim();
-    final wordCount = summary.isEmpty ? 0 : summary.split(RegExp(r'\s+')).length;
+    final wordCount = summary.isEmpty
+        ? 0
+        : summary.split(RegExp(r'\s+')).length;
 
     final now = DateTime.now().toIso8601String();
     await appDb.transaction(() async {
@@ -401,10 +438,12 @@ class SectionIndexService {
 
   Future<int> _lastParaOfBook(GeneratedDatabase epiDb, String bookId) async {
     try {
-      final rows = await epiDb.customSelect(
-        'SELECT MAX(para_id) as m FROM sentences WHERE book_id = ?',
-        variables: [Variable.withString(bookId)],
-      ).get();
+      final rows = await epiDb
+          .customSelect(
+            'SELECT MAX(para_id) as m FROM sentences WHERE book_id = ?',
+            variables: [Variable.withString(bookId)],
+          )
+          .get();
       return (rows.first.data['m'] as int?) ?? 0;
     } catch (_) {
       return 0;
@@ -417,16 +456,15 @@ class SectionIndexService {
     int paraId,
   ) async {
     try {
-      final rows = await enDb.customSelect(
-        'SELECT translation FROM sentences '
-        'WHERE book_id = ? AND para_id = ? AND translation IS NOT NULL '
-        "AND translation != '' "
-        'ORDER BY line_id ASC LIMIT 1',
-        variables: [
-          Variable.withString(bookId),
-          Variable.withInt(paraId),
-        ],
-      ).get();
+      final rows = await enDb
+          .customSelect(
+            'SELECT translation FROM sentences '
+            'WHERE book_id = ? AND para_id = ? AND translation IS NOT NULL '
+            "AND translation != '' "
+            'ORDER BY line_id ASC LIMIT 1',
+            variables: [Variable.withString(bookId), Variable.withInt(paraId)],
+          )
+          .get();
       return (rows.first.data['translation'] as String? ?? '').trim();
     } catch (_) {
       return '';
@@ -444,16 +482,18 @@ class SectionIndexService {
     if (enDb == null || paraIds.isEmpty) return result;
     try {
       final placeholders = paraIds.map((_) => '?').join(',');
-      final rows = await enDb.customSelect(
-        'SELECT para_id, translation FROM sentences '
-        'WHERE book_id = ? AND para_id IN ($placeholders) '
-        'AND translation IS NOT NULL AND translation != \'\' '
-        'ORDER BY para_id ASC, line_id ASC',
-        variables: [
-          Variable.withString(bookId),
-          ...paraIds.map((i) => Variable.withInt(i)),
-        ],
-      ).get();
+      final rows = await enDb
+          .customSelect(
+            'SELECT para_id, translation FROM sentences '
+            'WHERE book_id = ? AND para_id IN ($placeholders) '
+            'AND translation IS NOT NULL AND translation != \'\' '
+            'ORDER BY para_id ASC, line_id ASC',
+            variables: [
+              Variable.withString(bookId),
+              ...paraIds.map((i) => Variable.withInt(i)),
+            ],
+          )
+          .get();
       for (final row in rows) {
         final pid = row.data['para_id'] as int;
         final t = (row.data['translation'] as String? ?? '').trim();
@@ -479,12 +519,14 @@ class SectionIndexService {
     if (sectionRows.isEmpty) return result;
 
     // One query for the whole book's paragraphs, then assemble per section.
-    final rows = await db.customSelect(
-      'SELECT para_id, $column FROM sentences '
-      'WHERE book_id = ? AND $column IS NOT NULL AND $column != \'\' '
-      'ORDER BY para_id ASC, line_id ASC',
-      variables: [Variable.withString(bookId)],
-    ).get();
+    final rows = await db
+        .customSelect(
+          'SELECT para_id, $column FROM sentences '
+          'WHERE book_id = ? AND $column IS NOT NULL AND $column != \'\' '
+          'ORDER BY para_id ASC, line_id ASC',
+          variables: [Variable.withString(bookId)],
+        )
+        .get();
 
     // Group lines per para.
     final paras = <int, StringBuffer>{};
@@ -524,17 +566,19 @@ class SectionIndexService {
     String column,
   ) async {
     try {
-      final rows = await db.customSelect(
-        'SELECT $column FROM sentences '
-        'WHERE book_id = ? AND para_id >= ? AND para_id <= ? '
-        'AND $column IS NOT NULL AND $column != \'\' '
-        'ORDER BY para_id ASC, line_id ASC',
-        variables: [
-          Variable.withString(bookId),
-          Variable.withInt(start),
-          Variable.withInt(end),
-        ],
-      ).get();
+      final rows = await db
+          .customSelect(
+            'SELECT $column FROM sentences '
+            'WHERE book_id = ? AND para_id >= ? AND para_id <= ? '
+            'AND $column IS NOT NULL AND $column != \'\' '
+            'ORDER BY para_id ASC, line_id ASC',
+            variables: [
+              Variable.withString(bookId),
+              Variable.withInt(start),
+              Variable.withInt(end),
+            ],
+          )
+          .get();
       final buffer = StringBuffer();
       for (final row in rows) {
         buffer.write((row.data[column] as String? ?? '').trim());
@@ -558,13 +602,10 @@ class SectionIndexService {
   /// Returns `{section, children, parent}` where `parent` is null when the
   /// section is a top-level row (parent_para == 0) or its parent is not in
   /// the index. Returns null when the section does not exist.
-  Future<Map<String, dynamic>?> getSection(
-    String bookId,
-    int paraStart,
-  ) async {
+  Future<Map<String, dynamic>?> getSection(String bookId, int paraStart) async {
     try {
+      await ensureIndex();
       final appDb = await _ref.read(appDbProvider.future);
-      await _ensureTables(appDb);
 
       final row = await _selectSection(appDb, bookId, paraStart);
       if (row == null) return null;
@@ -572,23 +613,27 @@ class SectionIndexService {
       final section = _rowToSection(row);
 
       // Direct children: headings whose parent_para == this para_start.
-      final childrenRows = await appDb.customSelect(
-        'SELECT * FROM section_summaries '
-        'WHERE book_id = ? AND parent_para = ? '
-        'ORDER BY para_start ASC',
-        variables: [
-          Variable.withString(bookId),
-          Variable.withInt(paraStart),
-        ],
-      ).get();
+      final childrenRows = await appDb
+          .customSelect(
+            'SELECT * FROM section_summaries '
+            'WHERE book_id = ? AND parent_para = ? '
+            'ORDER BY para_start ASC',
+            variables: [
+              Variable.withString(bookId),
+              Variable.withInt(paraStart),
+            ],
+          )
+          .get();
       final children = childrenRows
-          .map((r) => {
-                'book_id': r.data['book_id'] as String,
-                'para_start': r.data['para_start'] as int,
-                'para_end': r.data['para_end'] as int,
-                'title': (r.data['title'] as String?) ?? '',
-                'title_en': (r.data['title_en'] as String?) ?? '',
-              })
+          .map(
+            (r) => {
+              'book_id': r.data['book_id'] as String,
+              'para_start': r.data['para_start'] as int,
+              'para_end': r.data['para_end'] as int,
+              'title': (r.data['title'] as String?) ?? '',
+              'title_en': (r.data['title_en'] as String?) ?? '',
+            },
+          )
           .toList();
 
       // Parent section.
@@ -616,14 +661,13 @@ class SectionIndexService {
     String bookId,
     int paraStart,
   ) async {
-    final rows = await appDb.customSelect(
-      'SELECT * FROM section_summaries '
-      'WHERE book_id = ? AND para_start = ?',
-      variables: [
-        Variable.withString(bookId),
-        Variable.withInt(paraStart),
-      ],
-    ).get();
+    final rows = await appDb
+        .customSelect(
+          'SELECT * FROM section_summaries '
+          'WHERE book_id = ? AND para_start = ?',
+          variables: [Variable.withString(bookId), Variable.withInt(paraStart)],
+        )
+        .get();
     return rows.isEmpty ? null : rows.first;
   }
 
@@ -648,9 +692,11 @@ class SectionIndexService {
   Future<bool> isIndexBuilt() async {
     try {
       final appDb = await _ref.read(appDbProvider.future);
-      final rows = await appDb.customSelect(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='section_summaries'",
-      ).get();
+      final rows = await appDb
+          .customSelect(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='section_summaries'",
+          )
+          .get();
       if (rows.isEmpty) return false;
       final count = await appDb
           .customSelect('SELECT COUNT(*) as cnt FROM section_summaries')

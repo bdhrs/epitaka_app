@@ -864,12 +864,7 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
             return [
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppDimensions.marginMobile,
-                    AppDimensions.sm,
-                    AppDimensions.marginMobile,
-                    0,
-                  ),
+                  padding: const EdgeInsets.only(top: AppDimensions.sm),
                   child: Text(
                     AppLocalizations.of(context).didYouMean,
                     style: AppTypography.labelSmall.copyWith(
@@ -880,12 +875,7 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
                 ),
               ),
               SliverPadding(
-                padding: const EdgeInsets.fromLTRB(
-                  AppDimensions.marginMobile,
-                  AppDimensions.sm,
-                  AppDimensions.marginMobile,
-                  32,
-                ),
+                padding: const EdgeInsets.fromLTRB(0, AppDimensions.sm, 0, 32),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
                     final result = results[index];
@@ -977,19 +967,22 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
               onSelectionChanged: (content) => _lastSelectedContent = content,
               contextMenuBuilder: (context, selectableRegionState) =>
                   _resultsContextMenu(context, selectableRegionState),
-              child: CustomScrollView(
-                controller: scrollController,
-                slivers: [
-                  ..._buildDictionarySections(
-                    colors,
-                    lookup,
-                    searchWord,
-                    enabledBooks,
-                  ),
-                  if (includePrefixSuggestions)
-                    ..._prefixSuggestionsSlivers(colors, ref),
-                  const SliverToBoxAdapter(child: SizedBox(height: 40)),
-                ],
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(10, AppDimensions.sm, 10, 0),
+                child: CustomScrollView(
+                  controller: scrollController,
+                  slivers: [
+                    ..._buildDictionarySections(
+                      colors,
+                      lookup,
+                      searchWord,
+                      enabledBooks,
+                    ),
+                    if (includePrefixSuggestions)
+                      ..._prefixSuggestionsSlivers(colors, ref),
+                    const SliverToBoxAdapter(child: SizedBox(height: 40)),
+                  ],
+                ),
               ),
             );
             _cachedResultsWidget = built;
@@ -1014,9 +1007,10 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
   /// - book_id=100 (Pāli definition) → linked sentence cards
   /// - everything else → plain-text definition lookup
   ///
-  /// Each section owns its own outer padding and returns a zero-size widget
-  /// when it has no record, so empty dictionaries simply disappear (no
-  /// "No entry found" text).
+  /// Each section owns only its bottom spacing (no side padding — the
+  /// results scroll view provides one uniform side padding) and returns a
+  /// zero-size widget when it has no record, so empty dictionaries simply
+  /// disappear (no "No entry found" text).
   List<Widget> _buildDictionarySections(
     ColorScheme colors,
     DpdFullLookup lookup,
@@ -1078,12 +1072,7 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
     final pali = settings.typography.pali;
     final paliFontFamily = pali.fontFamily.fontFamily;
     return Container(
-      margin: const EdgeInsets.fromLTRB(
-        AppDimensions.marginMobile,
-        0,
-        AppDimensions.marginMobile,
-        0,
-      ),
+      margin: const EdgeInsets.only(bottom: AppDimensions.sm),
       decoration: BoxDecoration(
         border: Border.all(
           color: colors.outlineVariant.withValues(alpha: 0.55),
@@ -1091,62 +1080,49 @@ class _DictionarySheetState extends ConsumerState<DictionarySheet> {
         borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
       ),
       child: Padding(
-        padding: EdgeInsetsGeometry.all(10),
+        padding: EdgeInsetsGeometry.all(8),
         child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Section label
-          Row(
-            children: [
-              Icon(Icons.auto_stories, size: 16, color: colors.primary),
-              const SizedBox(width: 6),
-              Text(
-                AppLocalizations.of(context).dpdDictionary,
-                style: AppTypography.labelSmall.copyWith(
-                  color: colors.primary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: (pali.fontSize * 0.55).clamp(9.0, 14.0),
-                  fontFamily: paliFontFamily,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Section label
+            Row(
+              children: [
+                Icon(Icons.auto_stories, size: 16, color: colors.primary),
+                const SizedBox(width: 6),
+                Text(
+                  AppLocalizations.of(context).dpdDictionary,
+                  style: AppTypography.labelSmall.copyWith(
+                    color: colors.primary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: (pali.fontSize * 0.55).clamp(9.0, 14.0),
+                    fontFamily: paliFontFamily,
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-
-          // Searched word
-          Text(
-            lookup.searchedKey,
-            style: AppTypography.displayPali.copyWith(
-              color: colors.onSurface,
-              fontSize: (pali.fontSize * 1.1).clamp(16.0, 28.0),
-              fontWeight: FontWeight.bold,
-              fontFamily: pali.fontFamily.fontFamily,
+              ],
             ),
-          ),
-          const SizedBox(height: 10),
+            const SizedBox(height: 6),
 
-          // Deconstructor cards (if available)
-          if (lookup.hasDeconstructor) ...[
-            _buildDeconstructorSection(colors, lookup),
-            const SizedBox(height: 12),
+            // Deconstructor cards (if available)
+            if (lookup.hasDeconstructor) ...[
+              _buildDeconstructorSection(colors, lookup),
+              const SizedBox(height: 12),
+            ],
+
+            // Headwords HTML — DpdHeadwordCard's DpdHtmlRichText wraps itself
+            // in ExcludeSemantics at the source (see dictionary_search_shared.dart)
+            // to avoid the flutter_html WidgetSpan merge-up '!conflict' assertion,
+            // so no extra wrapping is needed here.
+            if (lookup.hasHeadwords)
+              ...lookup.headwords.map((hw) {
+                return DpdHeadwordCard(
+                  lemma: hw.lemma1,
+                  meaningHtml: hw.meaningHtml,
+                  colors: colors,
+                );
+              }),
           ],
-
-          // Headwords HTML — DpdHeadwordCard's DpdHtmlRichText wraps itself
-          // in ExcludeSemantics at the source (see dictionary_search_shared.dart)
-          // to avoid the flutter_html WidgetSpan merge-up '!conflict' assertion,
-          // so no extra wrapping is needed here.
-          if (lookup.hasHeadwords)
-            ...lookup.headwords.map((hw) {
-              return DpdHeadwordCard(
-                lemma: hw.lemma1,
-                meaningHtml: hw.meaningHtml,
-                colors: colors,
-              );
-            }),
-          const SizedBox(height: 8),
-        ],
+        ),
       ),
-    ),
     );
   }
 

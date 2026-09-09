@@ -14,6 +14,7 @@ import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/utils/velthuis.dart';
 import '../../gavesana/screens/gavesana_drawer.dart';
+import '../../shared/widgets/ai_error_card.dart';
 import '../models/ai_qa_models.dart';
 import '../models/heading_attachment.dart';
 import '../providers/ai_qa_provider.dart';
@@ -1052,37 +1053,15 @@ class _VimamsaScreenState extends ConsumerState<VimamsaScreen> {
   }
 
   Widget _buildErrorBanner(String error, ColorScheme colors) {
-    return Container(
-      margin: const EdgeInsets.symmetric(
+    final provider = ref.watch(aiQaSettingsProvider.select((s) => s.provider));
+    return Padding(
+      padding: const EdgeInsets.symmetric(
         horizontal: AppDimensions.marginMobile,
       ),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colors.errorContainer.withValues(alpha: 0.3),
-        borderRadius: BorderRadius.circular(AppDimensions.radiusSm),
-        border: Border.all(color: colors.error.withValues(alpha: 0.3)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.error_outline, size: 16, color: colors.error),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              error,
-              style: AppTypography.labelSmall.copyWith(
-                color: colors.onErrorContainer,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          IconButton(
-            onPressed: () => ref.read(aiQaProvider.notifier).clearError(),
-            icon: Icon(Icons.close, size: 14, color: colors.onErrorContainer),
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 24, minHeight: 24),
-          ),
-        ],
+      child: AiErrorCard(
+        error: error,
+        provider: provider,
+        onClose: () => ref.read(aiQaProvider.notifier).clearError(),
       ),
     );
   }

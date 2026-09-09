@@ -12,6 +12,7 @@ library;
 import 'dart:convert';
 
 import 'package:drift/drift.dart' show Variable;
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
@@ -51,8 +52,10 @@ class StudyGuideQuery {
 /// One study guide for [query]: read from the local English translation DB
 /// first (offline), then from epitaka.org when the local DB predates the
 /// summaries table.
-final studyGuideProvider =
-    FutureProvider.family<StudyGuide?, StudyGuideQuery>((ref, query) async {
+final studyGuideProvider = FutureProvider.family<StudyGuide?, StudyGuideQuery>((
+  ref,
+  query,
+) async {
   final local = await _readLocalStudyGuide(ref, query);
   if (local != null) return local;
   return fetchStudyGuideFromWeb(
@@ -61,29 +64,60 @@ final studyGuideProvider =
   );
 });
 
-Future<StudyGuide?> _readLocalStudyGuide(
-  Ref ref,
-  StudyGuideQuery query,
-) async {
+Future<StudyGuide?> _readLocalStudyGuide(Ref ref, StudyGuideQuery query) async {
   try {
     final enDb = await ref.read(translationDbProvider('en').future);
-    if (enDb == null) return null;
-    final rows = await enDb.customSelect(
-      'SELECT title, content FROM summaries '
-      'WHERE book_id = ? AND section_id = ?',
-      variables: [Variable(query.bookId), Variable(query.sectionId)],
-    ).get();
-    if (rows.isEmpty) return null;
+    if (enDb == null) {
+      debugPrint(
+        '[STUDY] ${query.bookId}/${query.sectionId} local miss: epitaka_en.db not open',
+      );
+      return null;
+    }
+    final table = await enDb
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' "
+          'AND name = ?',
+          variables: [Variable('summaries')],
+        )
+        .get();
+    if (table.isEmpty) {
+      debugPrint(
+        '[STUDY] ${query.bookId}/${query.sectionId} local miss: no summaries table',
+      );
+      return null;
+    }
+    final rows = await enDb
+        .customSelect(
+          'SELECT title, content FROM summaries '
+          'WHERE book_id = ? AND section_id = ?',
+          variables: [Variable(query.bookId), Variable(query.sectionId)],
+        )
+        .get();
+    if (rows.isEmpty) {
+      debugPrint(
+        '[STUDY] ${query.bookId}/${query.sectionId} local miss: 0 rows → web fallback',
+      );
+      return null;
+    }
     // Both columns are NOT NULL in the summaries schema.
     final contentMd = rows.first.read<String>('content');
-    if (contentMd.trim().isEmpty) return null;
+    if (contentMd.trim().isEmpty) {
+      debugPrint(
+        '[STUDY] ${query.bookId}/${query.sectionId} local miss: empty content → web fallback',
+      );
+      return null;
+    }
+    debugPrint('[STUDY] ${query.bookId}/${query.sectionId} local hit');
     return StudyGuide(
       title: rows.first.read<String>('title'),
       contentMd: contentMd,
     );
-  } catch (_) {
+  } catch (e) {
     // Table missing on an older downloaded DB, or any read error — fall
     // back to the network endpoint.
+    debugPrint(
+      '[STUDY] ${query.bookId}/${query.sectionId} local miss: exception $e',
+    );
     return null;
   }
 }

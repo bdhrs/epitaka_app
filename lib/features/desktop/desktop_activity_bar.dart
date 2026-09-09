@@ -39,13 +39,9 @@ class DesktopActivityBar extends StatelessWidget {
     final loc = AppLocalizations.of(context);
 
     final items = <_ActivityItem>[
-      // Each entry carries the id of its global shortcut (see
-      // AppShortcuts.shortcutCatalog) so the tooltip can show the key
-      // hint; entries without one get the plain label.
-      //
-      // Order matches the mobile drawer:
-      //   Tipiṭaka, Vīmaṃsā, Search, Gavesanā,
-      //   Annotations, Outline, Dictionary, Script Converter, Translation Builder
+      // Order: Tipiṭaka, Vīmaṃsā (center tab, rendered second),
+      // Contents, Annotations, History, Search, Gavesanā,
+      // Dictionary, Script Converter, Translation Builder
       _ActivityItem(
         SidePanelType.library,
         Icons.library_books_outlined,
@@ -54,11 +50,18 @@ class DesktopActivityBar extends StatelessWidget {
         shortcutId: 'library-sidebar',
       ),
       _ActivityItem(
-        SidePanelType.search,
-        Icons.search,
-        Icons.search,
-        loc.search,
-        shortcutId: 'find-everywhere',
+        SidePanelType.contents,
+        Icons.format_list_bulleted,
+        Icons.format_list_bulleted,
+        loc.contents,
+        shortcutId: 'contents',
+      ),
+      _ActivityItem(
+        SidePanelType.outline,
+        Icons.account_tree_outlined,
+        Icons.account_tree_outlined,
+        loc.outline,
+        shortcutId: 'outline',
       ),
       _ActivityItem(
         SidePanelType.annotations,
@@ -68,24 +71,24 @@ class DesktopActivityBar extends StatelessWidget {
         shortcutId: 'annotations',
       ),
       _ActivityItem(
-        SidePanelType.contents,
-        Icons.format_list_bulleted,
-        Icons.format_list_bulleted,
-        loc.outline,
-        shortcutId: 'contents',
+        SidePanelType.history,
+        Icons.history,
+        Icons.history,
+        loc.history,
+        shortcutId: 'history',
+      ),
+      _ActivityItem(
+        SidePanelType.search,
+        Icons.search,
+        Icons.search,
+        loc.search,
+        shortcutId: 'find-everywhere',
       ),
       _ActivityItem(
         SidePanelType.gavesana,
         Icons.travel_explore,
         Icons.travel_explore,
         loc.gavesana,
-      ),
-      _ActivityItem(
-        SidePanelType.history,
-        Icons.history,
-        Icons.history,
-        loc.history,
-        shortcutId: 'history',
       ),
       _ActivityItem(
         SidePanelType.dictionary,
@@ -120,7 +123,27 @@ class DesktopActivityBar extends StatelessWidget {
             child: SingleChildScrollView(
               child: Column(
                 children: [
-                  for (final item in items)
+                  _ActivityBarButton(
+                    icon: items.first.isActive(activeSidebar)
+                        ? items.first.activeIcon
+                        : items.first.icon,
+                    tooltip: AppShortcuts.tooltip(
+                      items.first.label,
+                      items.first.shortcutId!,
+                    ),
+                    active: items.first.isActive(activeSidebar),
+                    onTap: () => onToggleSidebar(items.first.toggleSidebar!),
+                  ),
+                  // Vīmaṃsā center tab, second after Tipiṭaka
+                  _ActivityBarButton(
+                    icon: vimamsaActive
+                        ? Icons.auto_awesome
+                        : Icons.auto_awesome_outlined,
+                    tooltip: AppShortcuts.tooltip(loc.vimamsa, 'vimamsa'),
+                    active: vimamsaActive,
+                    onTap: onToggleVimamsa,
+                  ),
+                  for (final item in items.skip(1))
                     _ActivityBarButton(
                       icon: item.isActive(activeSidebar)
                           ? item.activeIcon
@@ -135,15 +158,6 @@ class DesktopActivityBar extends StatelessWidget {
                         }
                       },
                     ),
-                  // Vīmaṃsā center tab (separate group)
-                  _ActivityBarButton(
-                    icon: vimamsaActive
-                        ? Icons.auto_awesome
-                        : Icons.auto_awesome_outlined,
-                    tooltip: AppShortcuts.tooltip(loc.vimamsa, 'vimamsa'),
-                    active: vimamsaActive,
-                    onTap: onToggleVimamsa,
-                  ),
                 ],
               ),
             ),

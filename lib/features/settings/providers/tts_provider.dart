@@ -483,22 +483,25 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
     final start = DateTime.now();
 
     // Resolve the language to actually speak BEFORE the rate/pitch/language
-    // setup. Pāli is always spoken in Devanagari with a Hindi voice (it
-    // reads Pāli best). If no Hindi voice is installed the engine falls
-    // back to Sinhala, then ASCII Roman with an English voice — otherwise
-    // the engine speaks Devanagari glyphs with the wrong voice (mangled
-    // audio) or completes instantly (a silent skip).
+    // setup. Pāli is spoken in the user's chosen script (Hindi/Devanagari
+    // reads Pāli best) with the matching voice. If that voice isn't
+    // installed the engine falls back through the probe chain — otherwise
+    // it would speak the script with the wrong voice (mangled audio) or
+    // complete instantly (a silent skip).
     final ttsLangCode = language ?? _ttsLanguageFromSettings(settings);
     final isPaliLine =
         language == 'si' && paliRoman != null && paliRoman.isNotEmpty;
     String speakText = text;
     String effectiveLang = ttsLangCode;
     if (isPaliLine) {
+      final requestedScript = settings.ttsScript;
       final plan = await _paliSpeechForSystem(tts, text, paliRoman);
       speakText = plan.text;
       effectiveLang = plan.language;
-      // Notice only when Hindi wasn't available and the engine fell back.
-      if (plan.script != 'hi') _notePaliFallback(plan.script);
+      // Notice only when the requested script wasn't available and the
+      // engine fell back to something else — not on every intentional
+      // Telugu/Kannada/Sinhala choice.
+      if (plan.script != requestedScript) _notePaliFallback(plan.script);
     }
 
     // Rate — only call platform if changed. Pāli lines have their own
@@ -517,8 +520,62 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
       _cachedPitch = settings.ttsPitch;
     }
 
-    // TTS language — either the line's own language (e.g. 'si' for
-    // Sinhala-converted Pāli) or, by default, the first enabled
+    // TTS voice resolution runs BEFORE the language is applied.
+    // The Pāli voice picker used to be hardcoded to Hindi voices, so a
+    // Hindi voice is often selected while the Pāli script is Telugu /
+    // Kannada / Sinhala. Calling clearVoice() AFTER setLanguage() resets
+    // the engine's language on Android, so those scripts were then spoken
+    // with the wrong (default) voice — silent or mangled — while Hindi
+    // (voice matches language) kept working. Resolving here lets a
+    // mismatched voice be cleared BEFORE setLanguage() so the language
+    // sticks, and lets Pāli auto-pick a system voice for its script.
+    // Pāli lines use their own dedicated voice setting (ttsPaliVoice)
+    // separately from the translation voice.
+    final voiceName = isPaliLine ? settings.ttsPaliVoice : settings.ttsVoice;
+    final voiceKey = '$effectiveLang|$voiceName';
+    Map<String, String>? matchedVoice;
+    var voiceMismatch = false;
+    if (voiceName.isNotEmpty && voiceName != 'default') {
+      try {
+        final voices = await getVoices();
+        final matches = voices.where((v) => v['name'] == voiceName).toList();
+        if (matches.isNotEmpty) {
+          final voiceLang = (matches.first['locale'] ?? '')
+              .split(RegExp(r'[-_]'))
+              .first;
+          if (voiceLang.toLowerCase() == effectiveLang.toLowerCase()) {
+            matchedVoice = matches.first;
+          } else {
+            voiceMismatch = true;
+          }
+        }
+      } catch (e) {
+        developer.log('[TTS] voice lookup failed: $e', name: 'epitaka.tts');
+      }
+    }
+    if (voiceMismatch) {
+      // Clear a stale mismatched voice BEFORE setLanguage — clearing
+      // after would undo the language just applied.
+      if (_cachedVoiceKey != 'cleared|$effectiveLang') {
+        try {
+          await tts.clearVoice();
+        } catch (e) {
+          developer.log('[TTS] clearVoice failed: $e', name: 'epitaka.tts');
+        }
+        _cachedVoiceKey = 'cleared|$effectiveLang';
+        // Force the language to be (re-)applied below — the clear may
+        // have reset the engine back to its default locale.
+        _cachedLanguage = '';
+        developer.log(
+          '[TTS] Voice "$voiceName" skipped for $effectiveLang — '
+          'cleared before setLanguage',
+          name: 'epitaka.tts',
+        );
+      }
+    }
+
+    // TTS language — either the line's own language (e.g. 'te' for
+    // Telugu-converted Pāli) or, by default, the first enabled
     // translation following the user's translation order in settings.
     // Only cache the locale when it was actually applied: a failed
     // setLanguage (voice not installed) must not be cached, or the
@@ -534,51 +591,57 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
       }
     }
 
-    // TTS voice — apply the user's chosen voice from the system voice
-    // list, if one is set AND it belongs to the language being spoken.
-    // Pāli lines use their own dedicated voice setting (ttsPaliVoice)
-    // so users can pick the best Hindi voice for Pāli pronunciation
-    // separately from the translation voice.
-    final voiceName = isPaliLine
-        ? settings.ttsPaliVoice
-        : settings.ttsVoice;
-    final voiceKey = '$effectiveLang|$voiceName';
-    if (voiceName.isNotEmpty &&
-        voiceName != 'default' &&
-        voiceKey != _cachedVoiceKey) {
-      try {
-        final voices = await getVoices();
-        final matches = voices.where((v) => v['name'] == voiceName).toList();
-        if (matches.isNotEmpty) {
-          final voiceLang = (matches.first['locale'] ?? '')
-              .split(RegExp(r'[-_]'))
-              .first;
-          if (voiceLang.toLowerCase() == effectiveLang.toLowerCase()) {
-            await tts.setVoice(matches.first);
-            developer.log(
-              '[TTS] Applied system voice "$voiceName" for $effectiveLang',
-              name: 'epitaka.tts',
-            );
-          } else {
-            // Voice belongs to a different language — clear it so the
-            // language setting drives (critical for Sinhala Pāli).
-            await tts.clearVoice();
-            developer.log(
-              '[TTS] Voice "$voiceName" ($voiceLang) skipped for '
-              '$effectiveLang — cleared to default',
-              name: 'epitaka.tts',
-            );
-          }
-        } else {
+    // Apply the user's chosen voice when it matches the spoken language.
+    // When the user left the Pāli voice on 'default' (or it belongs to
+    // another language), auto-pick the first system voice for the Pāli
+    // script so Telugu/Kannada/Sinhala don't fall back to the engine's
+    // default (often English) voice and go silent.
+    if (matchedVoice != null) {
+      if (voiceKey != _cachedVoiceKey) {
+        try {
+          await tts.setVoice(matchedVoice);
           developer.log(
-            '[TTS] Voice "$voiceName" not found in system voices — '
-            'keeping default',
+            '[TTS] Applied system voice "$voiceName" for $effectiveLang',
             name: 'epitaka.tts',
           );
+        } catch (e) {
+          developer.log('[TTS] setVoice failed: $e', name: 'epitaka.tts');
         }
-      } catch (e) {
-        developer.log('[TTS] setVoice failed: $e', name: 'epitaka.tts');
+        _cachedVoiceKey = voiceKey;
       }
+    } else if (!voiceMismatch && isPaliLine) {
+      final autoKey = 'auto|$effectiveLang';
+      if (_cachedVoiceKey != autoKey && _cachedVoiceKey != voiceKey) {
+        try {
+          final voices = await getVoices();
+          final lc = effectiveLang.toLowerCase();
+          Map<String, String>? auto;
+          for (final v in voices) {
+            final loc = (v['locale'] ?? '').toLowerCase();
+            if (loc == lc ||
+                loc.startsWith('$lc-') ||
+                loc.startsWith('${lc}_')) {
+              auto = v;
+              break;
+            }
+          }
+          if (auto != null) {
+            await tts.setVoice(auto);
+            developer.log(
+              '[TTS] Auto-picked Pāli voice "${auto['name']}" for '
+              '$effectiveLang',
+              name: 'epitaka.tts',
+            );
+            _cachedVoiceKey = autoKey;
+          } else {
+            _cachedVoiceKey = voiceKey;
+          }
+        } catch (e) {
+          developer.log('[TTS] auto-voice failed: $e', name: 'epitaka.tts');
+          _cachedVoiceKey = voiceKey;
+        }
+      }
+    } else if (!isPaliLine) {
       _cachedVoiceKey = voiceKey;
     }
 
@@ -632,18 +695,30 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
     );
   }
 
-  /// Decide how to speak a Pāli line with the system engine. Resolves
-  /// once per session ([_paliPlan]) which script to use — Hindi
-  /// (Devanagari) first, then Sinhala, then ASCII Roman with an English
-  /// voice — by probing which voices are actually installed. The probe
-  /// applies the chosen language as a side effect, so [_cachedLanguage]
-  /// is kept in sync.
+  /// Decide how to speak a Pāli line with the system engine. Uses the
+  /// user's chosen script ([AppSettings.ttsScript]) when that voice is
+  /// installed, otherwise falls back to the probe chain (Hindi, Sinhala,
+  /// Roman). Resolved once per session ([_paliPlan]) and invalidated when
+  /// the setting changes or [stop] runs.
   Future<({String text, String language, String script})> _paliSpeechForSystem(
     FlutterTts tts,
     String sinhalaText,
     String romanText,
   ) async {
-    _paliPlan ??= await _resolvePaliScript(tts);
+    final script = _ref.read(settingsProvider).ttsScript;
+    if (_paliPlan == null || _paliPlan!.script != script) {
+      if (script == 'roman') {
+        _paliPlan = await _resolvePaliScript(tts);
+      } else {
+        final locale = _ttsLocaleForLanguage(script);
+        if (await _applyLanguage(tts, locale)) {
+          _cachedLanguage = locale;
+          _paliPlan = (script: script, language: script);
+        } else {
+          _paliPlan = await _resolvePaliScript(tts);
+        }
+      }
+    }
     final plan = _paliPlan!;
     final speech = paliSpeechText(
       sinhalaText,
@@ -688,13 +763,22 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
   }
 
   /// Prepare a Pāli line for the Supertonic engine. Its 31 languages have
-  /// no Sinhala, so Pāli is always spoken in Devanagari with a Hindi
-  /// voice.
+  /// no Sinhala. For Hindi uses Devanagari conversion; for other scripts
+  /// falls back to Roman (ASCII) since Supertonic has no Kannada/Telugu/Sinhala voices.
   ({String text, String language}) _paliForSupertonic(
     String sinhalaText,
     String romanText,
   ) {
-    return paliSpeechText(sinhalaText, romanText, script: 'hi', language: 'hi');
+    final script = _ref.read(settingsProvider).ttsScript;
+    // Supertonic only has Hindi among the Pāli-script options.
+    // For non-Hindi scripts, fall back to Roman (ASCII) for compatibility.
+    final useScript = script == 'hi' ? 'hi' : 'roman';
+    return paliSpeechText(
+      sinhalaText,
+      romanText,
+      script: useScript,
+      language: useScript == 'hi' ? 'hi' : 'en',
+    );
   }
 
   /// Adjust Devanagari Pāli specifically for the Hindi TTS engine.
@@ -730,16 +814,29 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
   /// Write [romanText]'s Pāli in [script] for the TTS voice, paired with
   /// the [language] the engine should speak it in. 'roman' strips the
   /// IAST diacritics so any (English) voice can read it. Pure + static.
+  static String stripPaliNumbers(String text) {
+    var out = text.replaceAll(RegExp(r'\p{Nd}+\s*\.*', unicode: true), ' ');
+    out = out.replaceAll(RegExp(r'\s+'), ' ');
+    out = out.replaceAllMapped(
+      RegExp(r'\s+([,;:.!?।॥])'),
+      (m) => '${m.group(1)}',
+    );
+    return out.trim();
+  }
+
   static ({String text, String language}) paliSpeechText(
     String sinhalaText,
     String romanText, {
     required String script,
     required String language,
   }) {
-    sinhalaText = sinhalaText.replaceAll(
-      "’’",
-      '',
-    ); // normalize apostrophes to right single quote
+    sinhalaText = stripPaliNumbers(
+      sinhalaText.replaceAll(
+        "’’",
+        '',
+      ), // normalize apostrophes to right single quote
+    );
+    romanText = stripPaliNumbers(romanText);
     switch (script) {
       case 'si':
         return (text: sinhalaText, language: language);
@@ -749,6 +846,12 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
           Script.devanagari,
         );
         return (text: _prepareHindiPaliTts(devanagari), language: language);
+      case 'kn':
+        final kannada = TextProcessor.convert(sinhalaText, Script.kannada);
+        return (text: kannada, language: language);
+      case 'te':
+        final telugu = TextProcessor.convert(sinhalaText, Script.telugu);
+        return (text: telugu, language: language);
       default:
         return (text: asciiRomanPali(romanText), language: language);
     }
@@ -757,6 +860,7 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
   /// Strip IAST diacritics from Roman Pāli so any TTS voice can read it
   /// ("evaṃ me sutaṃ" → "evam me sutam"); English voices mangle ā/ṭ/ṃ.
   static String asciiRomanPali(String text) {
+    text = stripPaliNumbers(text);
     const map = <String, String>{
       'ā': 'a',
       'ī': 'i',
@@ -826,7 +930,10 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
 
   /// Display name of a Pāli TTS script key.
   static String _paliScriptLabel(String script) => switch (script) {
+    'kn' => 'Kannada',
+    'te' => 'Telugu',
     'si' => 'Sinhala',
+    'hi' => 'Hindi (Sanskrit)',
     _ => 'Roman (English)',
   };
 
@@ -1135,6 +1242,7 @@ class TtsNotifier extends StateNotifier<TtsPlaybackState> {
       'id': 'id-ID',
       'ja': 'ja-JP',
       'km': 'km-KH',
+      'kn': 'kn-IN',
       'ko': 'ko-KR',
       'lo': 'lo-LA',
       'ml': 'ml-IN',

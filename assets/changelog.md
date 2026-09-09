@@ -1,14 +1,9 @@
-## What's new in version 1.0.21 (build 28)
+## What's new in version 1.1.0 (build 30)
 
-- [FIX] Fix UI setting, type pali in different scripts, / in windows path.
-- [Fix] iOS TTS Voice via _accessibilitySpeak  and Start Position (viewport thresholding logic)
-- [FIX] Fix TTS on ios and delay between lines of macos intel
-- [Add] Wire apple TTS to the workflow of the TTS, remove tts in selection in the dictionary, fix UI of TTS dialog, settings dialog
-- [Add] Wire apple TTS to the workflow of the TTS, remove tts in selection in the dictionary, fix UI of TTS dialog, settings dialog
-- [Add] dashed accent underline and remove bgcolor for tapped words for readability in darkmode
-- [Add] tapped word stays highlighted on desktop apps and single tap on mobile devices
-- [Add] iOS Siri voice for Speak in the context menu
-- [Add] Speak option in the context menu and using macOS Siri voice for macOS app
-- [Add] Summary of the books, manages items in the toolbar
-- [Fix]: Tapping a FTS result fails to scroll / jump to the correct postition when multiple translations are enabled or large paragraph
-- [Fix] desktop UI
+- [Fix] Prevent screen lock on index + download page.
+- [Fix] Clean the UI, Sinhala keyboard.
+- Clean up drawer, library appbar, and Vīmaṃsā UI
+- [Add] Separate Myanmar and Myanmar Nissaya to display them both at the same time
+- Update translation manifest
+- [Add] Color picker palette - manual color code input
+- Update translation manifest

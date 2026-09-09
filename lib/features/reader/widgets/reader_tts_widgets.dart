@@ -109,6 +109,7 @@ class TtsControlsCard extends StatelessWidget {
   final ValueChanged<String> onVoiceChanged;
   final ValueChanged<String> onPaliVoiceChanged;
   final ValueChanged<TtsSpeakMode> onSpeakModeChanged;
+  final ValueChanged<String> onScriptChanged;
   final VoidCallback onInstallVoiceTap;
   final VoidCallback onSystemConfigTap;
   final VoidCallback onClose;
@@ -126,6 +127,7 @@ class TtsControlsCard extends StatelessWidget {
     required this.onVoiceChanged,
     required this.onPaliVoiceChanged,
     required this.onSpeakModeChanged,
+    required this.onScriptChanged,
     required this.onInstallVoiceTap,
     required this.onSystemConfigTap,
     required this.onClose,
@@ -194,7 +196,32 @@ class TtsControlsCard extends StatelessWidget {
             ),
             const SizedBox(height: AppDimensions.md),
           ],
-          // Pāli comes first (the book shows Pāli above the translation).
+          // Pāli comes first (the book shows Pāli above the translation):
+          // script, then voice, then speed.
+          _TtsScriptDropdown(
+            selectedScript: settings.ttsScript,
+            onScriptChanged: onScriptChanged,
+            colors: colors,
+          ),
+          const SizedBox(height: AppDimensions.sm),
+          // Pāli voice picker for the chosen Pāli TTS script.
+          if (settings.ttsEngine == 'system') ...[
+            _CompactVoicePicker(
+              label: loc.ttsPaliVoice,
+              selectedVoice: settings.ttsPaliVoice,
+              voices: filterVoicesForLanguage(
+                voices,
+                settings.ttsScript,
+                selectedVoice: settings.ttsPaliVoice,
+                showAllIfEmpty: false,
+              ),
+              colors: colors,
+              onChanged: onPaliVoiceChanged,
+              showInstallHint: true,
+              langCode: settings.ttsScript,
+            ),
+            const SizedBox(height: AppDimensions.sm),
+          ],
           _ControlSlider(
             icon: Icons.menu_book,
             label: loc.ttsPaliSpeed,
@@ -205,25 +232,24 @@ class TtsControlsCard extends StatelessWidget {
             colors: colors,
             onChanged: onPaliSpeedChanged,
           ),
-          // Pāli voice picker (Hindi voices).
+          const SizedBox(height: AppDimensions.sm),
+          // Translation voice before speed.
           if (settings.ttsEngine == 'system') ...[
-            const SizedBox(height: 4),
             _CompactVoicePicker(
-              label: loc.ttsPaliVoice,
-              selectedVoice: settings.ttsPaliVoice,
+              label: loc.ttsTranslationVoice,
+              selectedVoice: settings.ttsVoice,
               voices: filterVoicesForLanguage(
                 voices,
-                'hi',
-                selectedVoice: settings.ttsPaliVoice,
-                showAllIfEmpty: false,
+                settings.visibleTranslationLangs.isNotEmpty
+                    ? settings.visibleTranslationLangs.first
+                    : 'en',
+                selectedVoice: settings.ttsVoice,
               ),
               colors: colors,
-              onChanged: onPaliVoiceChanged,
-              showInstallHint: true,
+              onChanged: onVoiceChanged,
             ),
+            const SizedBox(height: AppDimensions.sm),
           ],
-          const SizedBox(height: AppDimensions.sm),
-          // Translation speed + voice.
           _ControlSlider(
             icon: Icons.speed,
             label: loc.ttsTranslationSpeed,
@@ -304,23 +330,6 @@ class TtsControlsCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: AppDimensions.md),
-          // Translation voice picker.
-          if (settings.ttsEngine == 'system') ...[
-            _CompactVoicePicker(
-              label: loc.ttsTranslationVoice,
-              selectedVoice: settings.ttsVoice,
-              voices: filterVoicesForLanguage(
-                voices,
-                settings.visibleTranslationLangs.isNotEmpty
-                    ? settings.visibleTranslationLangs.first
-                    : 'en',
-                selectedVoice: settings.ttsVoice,
-              ),
-              colors: colors,
-              onChanged: onVoiceChanged,
-            ),
-            const SizedBox(height: AppDimensions.sm),
-          ],
           Row(
             children: [
               Expanded(
@@ -430,6 +439,10 @@ class _CompactVoicePicker extends StatelessWidget {
   final ValueChanged<String> onChanged;
   final bool showInstallHint;
 
+  /// Script/language code the voices were filtered for (e.g. the Pāli
+  /// TTS script). Used for the "voice not installed" hint.
+  final String langCode;
+
   const _CompactVoicePicker({
     required this.label,
     required this.selectedVoice,
@@ -437,7 +450,18 @@ class _CompactVoicePicker extends StatelessWidget {
     required this.colors,
     required this.onChanged,
     this.showInstallHint = false,
+    this.langCode = 'hi',
   });
+
+  /// Short display name of a Pāli TTS script code for the
+  /// "voice not installed" hint (matches the script dropdown labels).
+  static String _scriptShortLabel(String code) => switch (code) {
+    'kn' => 'Kannada',
+    'te' => 'Telugu',
+    'si' => 'Sinhala',
+    'hi' => 'Hindi',
+    _ => code,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -445,9 +469,10 @@ class _CompactVoicePicker extends StatelessWidget {
     final displayName = selectedVoice.isEmpty || selectedVoice == 'default'
         ? loc.systemDefault
         : (voices.firstWhere(
-            (v) => v['name'] == selectedVoice,
-            orElse: () => const {},
-          )['name'] ?? loc.systemDefault);
+                (v) => v['name'] == selectedVoice,
+                orElse: () => const {},
+              )['name'] ??
+              loc.systemDefault);
 
     // Show install hint when no voices match this language.
     if (voices.isEmpty && showInstallHint) {
@@ -464,7 +489,7 @@ class _CompactVoicePicker extends StatelessWidget {
             const SizedBox(width: 4),
             Flexible(
               child: Text(
-                loc.ttsHindiVoiceNotInstalled,
+                loc.ttsVoiceNotInstalledFor(_scriptShortLabel(langCode)),
                 overflow: TextOverflow.ellipsis,
                 style: AppTypography.labelSmall.copyWith(
                   color: colors.error,
@@ -481,10 +506,7 @@ class _CompactVoicePicker extends StatelessWidget {
       initialValue: selectedVoice,
       onSelected: onChanged,
       itemBuilder: (context) => [
-        PopupMenuItem<String>(
-          value: 'default',
-          child: Text(loc.systemDefault),
-        ),
+        PopupMenuItem<String>(value: 'default', child: Text(loc.systemDefault)),
         for (final v in voices)
           PopupMenuItem<String>(
             value: v['name'] ?? 'default',
@@ -516,14 +538,106 @@ class _CompactVoicePicker extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            Icon(
-              Icons.chevron_right,
-              size: 14,
-              color: colors.onSurfaceVariant,
-            ),
+            Icon(Icons.chevron_right, size: 14, color: colors.onSurfaceVariant),
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── TTS Script Dropdown ─────────────────────────────────────────────────
+
+/// Dropdown for selecting the TTS script/language for Pāli.
+/// Options: Kannada, Telugu, Sinhala, Hindi (Sanskrit).
+/// Only Hindi enables Devanagari conversion + replacement text.
+class _TtsScriptDropdown extends StatelessWidget {
+  final String selectedScript;
+  final ValueChanged<String> onScriptChanged;
+  final ColorScheme colors;
+
+  const _TtsScriptDropdown({
+    required this.selectedScript,
+    required this.onScriptChanged,
+    required this.colors,
+  });
+
+  static const _scriptOptions = [
+    ('kn', 'Kannada'),
+    ('te', 'Telugu'),
+    ('si', 'Sinhala'),
+    ('hi', 'Hindi (Sanskrit)'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final selectedLabel = _scriptOptions
+        .firstWhere(
+          (opt) => opt.$1 == selectedScript,
+          orElse: () => _scriptOptions.last,
+        )
+        .$2;
+
+    return Row(
+      children: [
+        Icon(Icons.language, size: 16, color: colors.primary),
+        const SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            loc.ttsScriptLabel,
+            style: AppTypography.labelSmall.copyWith(
+              color: colors.onSurface,
+              fontSize: 12,
+            ),
+          ),
+        ),
+        PopupMenuButton<String>(
+          initialValue: selectedScript,
+          onSelected: onScriptChanged,
+          itemBuilder: (context) => [
+            for (final opt in _scriptOptions)
+              PopupMenuItem<String>(
+                value: opt.$1,
+                child: Row(
+                  children: [
+                    if (opt.$1 == selectedScript)
+                      Icon(Icons.check, size: 16, color: colors.primary),
+                    if (opt.$1 == selectedScript) const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(opt.$2, overflow: TextOverflow.ellipsis),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              border: Border.all(color: colors.outlineVariant),
+              borderRadius: BorderRadius.circular(9999),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  selectedLabel,
+                  style: AppTypography.labelSmall.copyWith(
+                    color: colors.onSurfaceVariant,
+                    fontSize: 11,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.chevron_right,
+                  size: 14,
+                  color: colors.onSurfaceVariant,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

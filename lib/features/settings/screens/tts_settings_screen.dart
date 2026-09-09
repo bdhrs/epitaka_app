@@ -57,7 +57,9 @@ class _TtsSettingsBodyState extends ConsumerState<TtsSettingsBody> {
     super.initState();
     // Check supertonic model status on load
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(supertonicDownloadProvider.notifier).areModelsReady().then((ready) {
+      ref.read(supertonicDownloadProvider.notifier).areModelsReady().then((
+        ready,
+      ) {
         if (ready) {
           ref.read(settingsProvider.notifier).setTtsSupertonicDownloaded(true);
         }
@@ -96,422 +98,444 @@ class _TtsSettingsBodyState extends ConsumerState<TtsSettingsBody> {
         120,
       ),
       children: [
-          Text(
-            loc.textToSpeech,
-            style: AppTypography.headlineLarge.copyWith(
-              color: colors.onSurface,
+        Text(
+          loc.textToSpeech,
+          style: AppTypography.headlineLarge.copyWith(color: colors.onSurface),
+        ),
+        const SizedBox(height: AppDimensions.lg),
+
+        // ── Engine Selection ─────────────────────────────────────────
+        SettingsSection(
+          title: loc.engine,
+          colors: colors,
+          children: [
+            _EngineSelector(
+              currentEngine: settings.ttsEngine,
+              colors: colors,
+              onChanged: (engine) {
+                ref.read(settingsProvider.notifier).setTtsEngine(engine);
+              },
             ),
-          ),
-          const SizedBox(height: AppDimensions.lg),
+          ],
+        ),
+        const SizedBox(height: AppDimensions.md),
 
-          // ── Engine Selection ─────────────────────────────────────────
-          SettingsSection(
-            title: loc.engine,
-            colors: colors,
-            children: [
-              _EngineSelector(
-                currentEngine: settings.ttsEngine,
-                colors: colors,
-                onChanged: (engine) {
-                  ref.read(settingsProvider.notifier).setTtsEngine(engine);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.md),
+        // ── Speak mode (what to read aloud) ──────────────────────────
+        SettingsSection(
+          title: loc.ttsSpeakMode,
+          colors: colors,
+          children: [
+            _SpeakModeTile(
+              mode: TtsSpeakMode.translation,
+              label: loc.ttsSpeakTranslation,
+              description: loc.ttsSpeakTranslationDesc,
+              icon: Icons.translate,
+              isSelected: settings.ttsSpeakMode == TtsSpeakMode.translation,
+              colors: colors,
+              onTap: () {
+                ref
+                    .read(settingsProvider.notifier)
+                    .setTtsSpeakMode(TtsSpeakMode.translation);
+              },
+            ),
+            const Divider(
+              height: 1,
+              indent: AppDimensions.md,
+              endIndent: AppDimensions.md,
+            ),
+            _SpeakModeTile(
+              mode: TtsSpeakMode.pali,
+              label: loc.ttsSpeakPali,
+              description: loc.ttsSpeakPaliDesc,
+              icon: Icons.menu_book,
+              isSelected: settings.ttsSpeakMode == TtsSpeakMode.pali,
+              colors: colors,
+              onTap: () {
+                ref
+                    .read(settingsProvider.notifier)
+                    .setTtsSpeakMode(TtsSpeakMode.pali);
+              },
+            ),
+            const Divider(
+              height: 1,
+              indent: AppDimensions.md,
+              endIndent: AppDimensions.md,
+            ),
+            _SpeakModeTile(
+              mode: TtsSpeakMode.both,
+              label: loc.ttsSpeakBoth,
+              description: loc.ttsSpeakBothDesc,
+              icon: Icons.library_books,
+              isSelected: settings.ttsSpeakMode == TtsSpeakMode.both,
+              colors: colors,
+              onTap: () {
+                ref
+                    .read(settingsProvider.notifier)
+                    .setTtsSpeakMode(TtsSpeakMode.both);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimensions.md),
 
-          // ── Speak mode (what to read aloud) ──────────────────────────
-          SettingsSection(
-            title: loc.ttsSpeakMode,
-            colors: colors,
-            children: [
-              _SpeakModeTile(
-                mode: TtsSpeakMode.translation,
-                label: loc.ttsSpeakTranslation,
-                description: loc.ttsSpeakTranslationDesc,
-                icon: Icons.translate,
-                isSelected: settings.ttsSpeakMode == TtsSpeakMode.translation,
-                colors: colors,
-                onTap: () {
-                  ref
-                      .read(settingsProvider.notifier)
-                      .setTtsSpeakMode(TtsSpeakMode.translation);
-                },
-              ),
-              const Divider(
-                height: 1,
-                indent: AppDimensions.md,
-                endIndent: AppDimensions.md,
-              ),
-              _SpeakModeTile(
-                mode: TtsSpeakMode.pali,
-                label: loc.ttsSpeakPali,
-                description: loc.ttsSpeakPaliDesc,
-                icon: Icons.menu_book,
-                isSelected: settings.ttsSpeakMode == TtsSpeakMode.pali,
-                colors: colors,
-                onTap: () {
-                  ref
-                      .read(settingsProvider.notifier)
-                      .setTtsSpeakMode(TtsSpeakMode.pali);
-                },
-              ),
-              const Divider(
-                height: 1,
-                indent: AppDimensions.md,
-                endIndent: AppDimensions.md,
-              ),
-              _SpeakModeTile(
-                mode: TtsSpeakMode.both,
-                label: loc.ttsSpeakBoth,
-                description: loc.ttsSpeakBothDesc,
-                icon: Icons.library_books,
-                isSelected: settings.ttsSpeakMode == TtsSpeakMode.both,
-                colors: colors,
-                onTap: () {
-                  ref
-                      .read(settingsProvider.notifier)
-                      .setTtsSpeakMode(TtsSpeakMode.both);
-                },
-              ),
-            ],
-          ),
-          const SizedBox(height: AppDimensions.md),
+        // ── TTS Script/Language for Pāli ────────────────────────────
+        // Choose which script/language to use for Pāli TTS.
+        // Hindi (Sanskrit) enables Devanagari conversion + replacement text.
+        // Other scripts use their natural script without replacement.
+        SettingsSection(
+          title: loc.ttsScriptLabel,
+          colors: colors,
+          children: [
+            _TtsScriptSettingsTile(
+              selectedScript: settings.ttsScript,
+              colors: colors,
+              onScriptChanged: (script) {
+                ref.read(settingsProvider.notifier).setTtsScript(script);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimensions.md),
 
-          // ── Install a Pāli voice ─────────────────────────────────────
-          // Pāli is always read in Devanagari (Hindi) — the script that
-          // reads Pāli best. If the device has no Hindi voice, this tile
-          // opens the system TTS settings to install one.
-          SettingsSection(
-            title: loc.ttsInstallVoice,
-            colors: colors,
-            children: [
-              ListTile(
-                contentPadding: const EdgeInsets.symmetric(
-                  horizontal: AppDimensions.md,
+        // ── Install a Pāli voice ─────────────────────────────────────
+        // Pāli is always read in Devanagari (Hindi) — the script that
+        // reads Pāli best. If the device has no Hindi voice, this tile
+        // opens the system TTS settings to install one.
+        SettingsSection(
+          title: loc.ttsInstallVoice,
+          colors: colors,
+          children: [
+            ListTile(
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: AppDimensions.md,
+              ),
+              leading: Icon(Icons.download, color: colors.primary),
+              title: Text(
+                loc.ttsInstallVoice,
+                style: AppTypography.labelMedium.copyWith(
+                  color: colors.onSurface,
                 ),
-                leading: Icon(Icons.download, color: colors.primary),
-                title: Text(
-                  loc.ttsInstallVoice,
-                  style: AppTypography.labelMedium.copyWith(
-                    color: colors.onSurface,
-                  ),
-                ),
-                subtitle: Text(
-                  loc.ttsInstallVoiceHint,
-                  style: AppTypography.labelSmall.copyWith(
-                    color: colors.onSurfaceVariant,
-                  ),
-                ),
-                trailing: Icon(
-                  Icons.chevron_right,
+              ),
+              subtitle: Text(
+                loc.ttsInstallVoiceHint,
+                style: AppTypography.labelSmall.copyWith(
                   color: colors.onSurfaceVariant,
                 ),
-                onTap: () => openSystemTtsSettings(context),
+              ),
+              trailing: Icon(
+                Icons.chevron_right,
+                color: colors.onSurfaceVariant,
+              ),
+              onTap: () => openSystemTtsSettings(context),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimensions.md),
+
+        // ── Supertonic: Download & Setup ─────────────────────────────
+        if (isSupertonic) ...[
+          SettingsSection(
+            title: loc.modelDownload,
+            colors: colors,
+            children: [
+              _SupertonicDownloadTile(
+                downloadState: downloadState,
+                settings: settings,
+                colors: colors,
+                onDownload: () {
+                  ref
+                      .read(supertonicDownloadProvider.notifier)
+                      .downloadModels(ref);
+                },
+                onCancel: () {
+                  ref
+                      .read(supertonicDownloadProvider.notifier)
+                      .cancelDownload();
+                },
               ),
             ],
           ),
           const SizedBox(height: AppDimensions.md),
 
-          // ── Supertonic: Download & Setup ─────────────────────────────
-          if (isSupertonic) ...[
+          if (settings.ttsSupertonicDownloaded) ...[
+            // Language — now follows the reading language automatically.
             SettingsSection(
-              title: loc.modelDownload,
+              title: loc.language,
               colors: colors,
               children: [
-                _SupertonicDownloadTile(
-                  downloadState: downloadState,
-                  settings: settings,
+                _InfoTile(
+                  icon: Icons.language,
+                  title: loc.ttsLanguageLabel2,
+                  subtitle: loc.ttsLanguageAutoNote,
                   colors: colors,
-                  onDownload: () {
-                    ref
-                        .read(supertonicDownloadProvider.notifier)
-                        .downloadModels(ref);
-                  },
-                  onCancel: () {
-                    ref
-                        .read(supertonicDownloadProvider.notifier)
-                        .cancelDownload();
-                  },
                 ),
               ],
             ),
             const SizedBox(height: AppDimensions.md),
 
-            if (settings.ttsSupertonicDownloaded) ...[
-              // Language — now follows the reading language automatically.
-              SettingsSection(
-                title: loc.language,
-                colors: colors,
-                children: [
-                  _InfoTile(
-                    icon: Icons.language,
-                    title: loc.ttsLanguageLabel2,
-                    subtitle: loc.ttsLanguageAutoNote,
-                    colors: colors,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimensions.md),
-
-              // Voice style selection
-              SettingsSection(
-                title: loc.voiceStyle,
-                colors: colors,
-                children: [
-                  _DropdownTile(
-                    icon: Icons.record_voice_over,
-                    title: loc.ttsVoiceLabel,
-                    value: _supertonicVoices.firstWhere(
-                      (v) => v.$1 == settings.ttsSupertonicVoice,
-                      orElse: () => ('M1', 'Male Voice 1'),
-                    ).$2,
-                    options: _supertonicVoices.map((v) => v.$2).toList(),
-                    selectedValue: _supertonicVoices.firstWhere(
-                      (v) => v.$1 == settings.ttsSupertonicVoice,
-                      orElse: () => ('M1', 'Male Voice 1'),
-                    ).$2,
-                    onSelected: (label) {
-                      final entry = _supertonicVoices.firstWhere(
-                        (v) => v.$2 == label,
+            // Voice style selection
+            SettingsSection(
+              title: loc.voiceStyle,
+              colors: colors,
+              children: [
+                _DropdownTile(
+                  icon: Icons.record_voice_over,
+                  title: loc.ttsVoiceLabel,
+                  value: _supertonicVoices
+                      .firstWhere(
+                        (v) => v.$1 == settings.ttsSupertonicVoice,
                         orElse: () => ('M1', 'Male Voice 1'),
-                      );
-                      ref
-                          .read(settingsProvider.notifier)
-                          .setTtsSupertonicVoice(entry.$1);
-                    },
-                    colors: colors,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimensions.md),
-
-              // Synthesis quality (denoising steps).
-              SettingsSection(
-                title: loc.quality,
-                colors: colors,
-                children: [
-                  _DropdownTile(
-                    icon: Icons.tune,
-                    title: loc.quality,
-                    value: _qualityLabel(settings.ttsSupertonicQuality),
-                    options: const ['Low', 'Medium', 'High'],
-                    selectedValue: _qualityLabel(settings.ttsSupertonicQuality),
-                    onSelected: (label) {
-                      final code = label.toLowerCase();
-                      ref
-                          .read(settingsProvider.notifier)
-                          .setTtsSupertonicQuality(code);
-                    },
-                    colors: colors,
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppDimensions.md,
-                      0,
-                      AppDimensions.md,
-                      AppDimensions.md,
-                    ),
-                    child: Text(
-                      loc.qualitySubtitle,
-                      style: AppTypography.labelSmall.copyWith(
-                        color: colors.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppDimensions.md),
-            ],
-          ],
-
-          // ── Pāli speed + voice ────────────────────────────────────────
-          if (!isSupertonic) ...[
-            SettingsSection(
-              title: loc.ttsPaliSpeed,
-              colors: colors,
-              children: [
-                _SpeedSlider(
-                  value: settings.ttsPaliSpeed,
-                  min: 0.1,
-                  max: 3.0,
-                  // 29 divisions → clean 0.1 steps across the 0.1–3.0 range.
-                  divisions: 29,
-                  label: '${settings.ttsPaliSpeed.toStringAsFixed(1)}×',
-                  colors: colors,
-                  onChanged: (v) {
-                    ref.read(settingsProvider.notifier).setTtsPaliSpeed(v);
-                  },
-                ),
-                const Divider(
-                  height: 1,
-                  indent: AppDimensions.md,
-                  endIndent: AppDimensions.md,
-                ),
-                // Pāli voice (Hindi/Devanagari) — separate from the
-                // translation voice so users can pick the best Hindi voice
-                // for Pāli pronunciation.
-                _RealVoiceTile(
-                  icon: Icons.record_voice_over,
-                  title: loc.ttsPaliVoice,
-                  selectedVoice: settings.ttsPaliVoice,
-                  langCode: 'hi',
-                  allVoices: _cachedVoices ?? const [],
-                  loading: _voicesLoading,
-                  colors: colors,
-                  showNoVoiceHint: true,
-                  onVoiceChanged: (name) {
+                      )
+                      .$2,
+                  options: _supertonicVoices.map((v) => v.$2).toList(),
+                  selectedValue: _supertonicVoices
+                      .firstWhere(
+                        (v) => v.$1 == settings.ttsSupertonicVoice,
+                        orElse: () => ('M1', 'Male Voice 1'),
+                      )
+                      .$2,
+                  onSelected: (label) {
+                    final entry = _supertonicVoices.firstWhere(
+                      (v) => v.$2 == label,
+                      orElse: () => ('M1', 'Male Voice 1'),
+                    );
                     ref
                         .read(settingsProvider.notifier)
-                        .setTtsPaliVoice(name);
+                        .setTtsSupertonicVoice(entry.$1);
                   },
+                  colors: colors,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppDimensions.md),
+
+            // Synthesis quality (denoising steps).
+            SettingsSection(
+              title: loc.quality,
+              colors: colors,
+              children: [
+                _DropdownTile(
+                  icon: Icons.tune,
+                  title: loc.quality,
+                  value: _qualityLabel(settings.ttsSupertonicQuality),
+                  options: const ['Low', 'Medium', 'High'],
+                  selectedValue: _qualityLabel(settings.ttsSupertonicQuality),
+                  onSelected: (label) {
+                    final code = label.toLowerCase();
+                    ref
+                        .read(settingsProvider.notifier)
+                        .setTtsSupertonicQuality(code);
+                  },
+                  colors: colors,
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppDimensions.md,
+                    0,
+                    AppDimensions.md,
+                    AppDimensions.md,
+                  ),
+                  child: Text(
+                    loc.qualitySubtitle,
+                    style: AppTypography.labelSmall.copyWith(
+                      color: colors.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: AppDimensions.md),
           ],
+        ],
 
-          // ── Translation speed + voice ────────────────────────────────
+        // ── Pāli speed + voice ────────────────────────────────────────
+        if (!isSupertonic) ...[
           SettingsSection(
-            title: loc.ttsTranslationSpeed,
+            title: loc.ttsPaliSpeed,
             colors: colors,
             children: [
               _SpeedSlider(
-                value: settings.ttsSpeed,
-                min: 0.5,
-                max: 8.0,
-                divisions: 71,
-                label: '${settings.ttsSpeed.toStringAsFixed(1)}×',
+                value: settings.ttsPaliSpeed,
+                min: 0.1,
+                max: 3.0,
+                // 29 divisions → clean 0.1 steps across the 0.1–3.0 range.
+                divisions: 29,
+                label: '${settings.ttsPaliSpeed.toStringAsFixed(1)}×',
                 colors: colors,
                 onChanged: (v) {
-                  ref.read(settingsProvider.notifier).setTtsSpeed(v);
+                  ref.read(settingsProvider.notifier).setTtsPaliSpeed(v);
                 },
               ),
-              if (!isSupertonic) ...[
-                const Divider(
-                  height: 1,
-                  indent: AppDimensions.md,
-                  endIndent: AppDimensions.md,
-                ),
-                _RealVoiceTile(
-                  icon: Icons.record_voice_over,
-                  title: loc.ttsTranslationVoice,
-                  selectedVoice: settings.ttsVoice,
-                  langCode: settings.visibleTranslationLangs.isNotEmpty
-                      ? settings.visibleTranslationLangs.first
-                      : 'en',
-                  allVoices: _cachedVoices ?? const [],
-                  loading: _voicesLoading,
-                  colors: colors,
-                  onVoiceChanged: (name) {
-                    ref
-                        .read(settingsProvider.notifier)
-                        .setTtsVoice(name);
-                  },
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: AppDimensions.md),
-
-          // ── Pitch ────────────────────────────────────────────────────
-          SettingsSection(
-            title: loc.ttPitch,
-            colors: colors,
-            children: [
-              _SpeedSlider(
-                value: settings.ttsPitch,
-                min: 0.5,
-                max: 2.0,
-                divisions: 6,
-                label: '${settings.ttsPitch.toStringAsFixed(1)}×',
+              const Divider(
+                height: 1,
+                indent: AppDimensions.md,
+                endIndent: AppDimensions.md,
+              ),
+              // Pāli voice for the chosen Pāli TTS script — separate
+              // from the translation voice so users can pick the best
+              // voice for Pāli pronunciation.
+              _RealVoiceTile(
+                icon: Icons.record_voice_over,
+                title: loc.ttsPaliVoice,
+                selectedVoice: settings.ttsPaliVoice,
+                langCode: settings.ttsScript,
+                allVoices: _cachedVoices ?? const [],
+                loading: _voicesLoading,
                 colors: colors,
-                onChanged: (v) {
-                  ref.read(settingsProvider.notifier).setTtsPitch(v);
+                showNoVoiceHint: true,
+                onVoiceChanged: (name) {
+                  ref.read(settingsProvider.notifier).setTtsPaliVoice(name);
                 },
               ),
             ],
           ),
           const SizedBox(height: AppDimensions.md),
+        ],
 
-          // ── Preview ──────────────────────────────────────────────────
-          SettingsSection(
-            title: loc.preview,
-            colors: colors,
-            children: [
-              Padding(
-                padding: const EdgeInsets.all(AppDimensions.md),
-                child: Row(
-                  children: [
-                    Icon(
-                      ttsPlayback == TtsPlaybackState.playing
-                          ? Icons.volume_up
-                          : Icons.volume_up,
-                      color: colors.primary,
-                    ),
-                    const SizedBox(width: AppDimensions.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            _testButtonLabel(ttsPlayback),
-                            style: AppTypography.labelMedium.copyWith(
-                              color: colors.onSurface,
-                            ),
+        // ── Translation speed + voice ────────────────────────────────
+        SettingsSection(
+          title: loc.ttsTranslationSpeed,
+          colors: colors,
+          children: [
+            _SpeedSlider(
+              value: settings.ttsSpeed,
+              min: 0.5,
+              max: 8.0,
+              divisions: 71,
+              label: '${settings.ttsSpeed.toStringAsFixed(1)}×',
+              colors: colors,
+              onChanged: (v) {
+                ref.read(settingsProvider.notifier).setTtsSpeed(v);
+              },
+            ),
+            if (!isSupertonic) ...[
+              const Divider(
+                height: 1,
+                indent: AppDimensions.md,
+                endIndent: AppDimensions.md,
+              ),
+              _RealVoiceTile(
+                icon: Icons.record_voice_over,
+                title: loc.ttsTranslationVoice,
+                selectedVoice: settings.ttsVoice,
+                langCode: settings.visibleTranslationLangs.isNotEmpty
+                    ? settings.visibleTranslationLangs.first
+                    : 'en',
+                allVoices: _cachedVoices ?? const [],
+                loading: _voicesLoading,
+                colors: colors,
+                onVoiceChanged: (name) {
+                  ref.read(settingsProvider.notifier).setTtsVoice(name);
+                },
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: AppDimensions.md),
+
+        // ── Pitch ────────────────────────────────────────────────────
+        SettingsSection(
+          title: loc.ttPitch,
+          colors: colors,
+          children: [
+            _SpeedSlider(
+              value: settings.ttsPitch,
+              min: 0.5,
+              max: 2.0,
+              divisions: 6,
+              label: '${settings.ttsPitch.toStringAsFixed(1)}×',
+              colors: colors,
+              onChanged: (v) {
+                ref.read(settingsProvider.notifier).setTtsPitch(v);
+              },
+            ),
+          ],
+        ),
+        const SizedBox(height: AppDimensions.md),
+
+        // ── Preview ──────────────────────────────────────────────────
+        SettingsSection(
+          title: loc.preview,
+          colors: colors,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(AppDimensions.md),
+              child: Row(
+                children: [
+                  Icon(
+                    ttsPlayback == TtsPlaybackState.playing
+                        ? Icons.volume_up
+                        : Icons.volume_up,
+                    color: colors.primary,
+                  ),
+                  const SizedBox(width: AppDimensions.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _testButtonLabel(ttsPlayback),
+                          style: AppTypography.labelMedium.copyWith(
+                            color: colors.onSurface,
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            _testButtonSubtitle(ttsPlayback),
-                            style: AppTypography.labelSmall.copyWith(
-                              color: colors.onSurfaceVariant,
-                            ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          _testButtonSubtitle(ttsPlayback),
+                          style: AppTypography.labelSmall.copyWith(
+                            color: colors.onSurfaceVariant,
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    if (ttsPlayback == TtsPlaybackState.playing ||
-                        ttsPlayback == TtsPlaybackState.paused)
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          if (ttsPlayback == TtsPlaybackState.playing)
-                            IconButton(
-                              icon: Icon(Icons.pause_circle_filled,
-                                  color: colors.primary),
-                              onPressed: () {
-                                ref.read(ttsProvider.notifier).pause();
-                              },
-                            ),
-                          if (ttsPlayback == TtsPlaybackState.paused)
-                            IconButton(
-                              icon: Icon(Icons.play_circle_fill,
-                                  color: colors.primary),
-                              onPressed: () {
-                                ref.read(ttsProvider.notifier).resume();
-                              },
-                            ),
+                  ),
+                  if (ttsPlayback == TtsPlaybackState.playing ||
+                      ttsPlayback == TtsPlaybackState.paused)
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (ttsPlayback == TtsPlaybackState.playing)
                           IconButton(
-                            icon: Icon(Icons.stop_circle,
-                                color: colors.onSurfaceVariant),
+                            icon: Icon(
+                              Icons.pause_circle_filled,
+                              color: colors.primary,
+                            ),
                             onPressed: () {
-                              ref.read(ttsProvider.notifier).stop();
+                              ref.read(ttsProvider.notifier).pause();
                             },
                           ),
-                        ],
-                      )
-                    else
-                      IconButton(
-                        icon: Icon(Icons.play_circle_fill,
-                            color: colors.primary),
-                        onPressed: () => _testSpeech(),
-                      ),
-                  ],
-                ),
+                        if (ttsPlayback == TtsPlaybackState.paused)
+                          IconButton(
+                            icon: Icon(
+                              Icons.play_circle_fill,
+                              color: colors.primary,
+                            ),
+                            onPressed: () {
+                              ref.read(ttsProvider.notifier).resume();
+                            },
+                          ),
+                        IconButton(
+                          icon: Icon(
+                            Icons.stop_circle,
+                            color: colors.onSurfaceVariant,
+                          ),
+                          onPressed: () {
+                            ref.read(ttsProvider.notifier).stop();
+                          },
+                        ),
+                      ],
+                    )
+                  else
+                    IconButton(
+                      icon: Icon(Icons.play_circle_fill, color: colors.primary),
+                      onPressed: () => _testSpeech(),
+                    ),
+                ],
               ),
-            ],
-          ),
-        ],
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -582,9 +606,7 @@ class _SpeakModeTile extends StatelessWidget {
         child: Row(
           children: [
             Icon(
-              isSelected
-                  ? Icons.radio_button_checked
-                  : Icons.radio_button_off,
+              isSelected ? Icons.radio_button_checked : Icons.radio_button_off,
               color: isSelected ? colors.primary : colors.onSurfaceVariant,
               size: 20,
             ),
@@ -599,8 +621,9 @@ class _SpeakModeTile extends StatelessWidget {
                     label,
                     style: AppTypography.labelMedium.copyWith(
                       color: isSelected ? colors.primary : colors.onSurface,
-                      fontWeight:
-                          isSelected ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     ),
                   ),
                   Text(
@@ -646,7 +669,11 @@ class _EngineSelector extends StatelessWidget {
           colors: colors,
           onTap: () => onChanged('system'),
         ),
-        const Divider(height: 1, indent: AppDimensions.md, endIndent: AppDimensions.md),
+        const Divider(
+          height: 1,
+          indent: AppDimensions.md,
+          endIndent: AppDimensions.md,
+        ),
         _EngineOption(
           engine: 'supertonic',
           label: loc.supertonic,
@@ -707,7 +734,9 @@ class _EngineOption extends StatelessWidget {
                     label,
                     style: AppTypography.labelMedium.copyWith(
                       color: isSelected ? colors.primary : colors.onSurface,
-                      fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                      fontWeight: isSelected
+                          ? FontWeight.w600
+                          : FontWeight.w400,
                     ),
                   ),
                   Text(
@@ -776,9 +805,7 @@ class _SupertonicDownloadTile extends StatelessWidget {
                       ),
                     ),
                     Text(
-                      isDownloaded
-                          ? loc.allModelsReady
-                          : loc.requiresDownload,
+                      isDownloaded ? loc.allModelsReady : loc.requiresDownload,
                       style: AppTypography.labelSmall.copyWith(
                         color: colors.onSurfaceVariant,
                       ),
@@ -817,7 +844,9 @@ class _SupertonicDownloadTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(9999),
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(9999),
                       color: colors.primary,
@@ -1040,10 +1069,7 @@ class _DropdownTile extends StatelessWidget {
             onSelected: onSelected,
             itemBuilder: (context) => [
               for (final opt in options)
-                PopupMenuItem(
-                  value: opt,
-                  child: Text(opt),
-                ),
+                PopupMenuItem(value: opt, child: Text(opt)),
             ],
             child: Row(
               mainAxisSize: MainAxisSize.min,
@@ -1066,8 +1092,6 @@ class _DropdownTile extends StatelessWidget {
 }
 
 // ── Voice options ────────────────────────────────────────────────────────
-
-
 
 /// Display label for a Supertonic quality preset ('low' | 'medium' | 'high').
 String _qualityLabel(String quality) {
@@ -1110,6 +1134,16 @@ class _RealVoiceTile extends StatelessWidget {
     required this.onVoiceChanged,
     this.showNoVoiceHint = false,
   });
+
+  /// Short display name of a Pāli TTS script code for the
+  /// "voice not installed" hint (matches the script dropdown labels).
+  static String _scriptShortLabel(String code) => switch (code) {
+    'kn' => 'Kannada',
+    'te' => 'Telugu',
+    'si' => 'Sinhala',
+    'hi' => 'Hindi',
+    _ => code,
+  };
 
   @override
   Widget build(BuildContext context) {
@@ -1157,7 +1191,9 @@ class _RealVoiceTile extends StatelessWidget {
                 color: colors.onSurfaceVariant,
               ),
             )
-          else if (filtered.isEmpty && showNoVoiceHint && selectedVoice == 'default')
+          else if (filtered.isEmpty &&
+              showNoVoiceHint &&
+              selectedVoice == 'default')
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -1170,7 +1206,7 @@ class _RealVoiceTile extends StatelessWidget {
                   Icon(Icons.warning_amber, size: 12, color: colors.error),
                   const SizedBox(width: 4),
                   Text(
-                    loc.ttsHindiVoiceNotInstalled,
+                    loc.ttsVoiceNotInstalledFor(_scriptShortLabel(langCode)),
                     style: AppTypography.labelSmall.copyWith(
                       color: colors.error,
                       fontSize: 10,
@@ -1284,6 +1320,87 @@ class _InfoTile extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── TTS Script Settings Tile ─────────────────────────────────────────────
+
+/// Settings tile for selecting the TTS script/language for Pāli.
+class _TtsScriptSettingsTile extends StatelessWidget {
+  final String selectedScript;
+  final ColorScheme colors;
+  final ValueChanged<String> onScriptChanged;
+
+  const _TtsScriptSettingsTile({
+    required this.selectedScript,
+    required this.colors,
+    required this.onScriptChanged,
+  });
+
+  static const _scriptOptions = [
+    ('kn', 'Kannada'),
+    ('te', 'Telugu'),
+    ('si', 'Sinhala'),
+    ('hi', 'Hindi (Sanskrit)'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
+    final selectedLabel = _scriptOptions
+        .firstWhere(
+          (opt) => opt.$1 == selectedScript,
+          orElse: () => _scriptOptions.last,
+        )
+        .$2;
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Icon(Icons.language, color: colors.primary),
+      title: Text(
+        loc.ttsScriptLabel,
+        style: AppTypography.labelMedium.copyWith(color: colors.onSurface),
+      ),
+      subtitle: Text(
+        selectedLabel,
+        style: AppTypography.labelSmall.copyWith(
+          color: colors.onSurfaceVariant,
+        ),
+      ),
+      trailing: PopupMenuButton<String>(
+        initialValue: selectedScript,
+        onSelected: onScriptChanged,
+        itemBuilder: (context) => [
+          for (final opt in _scriptOptions)
+            PopupMenuItem<String>(
+              value: opt.$1,
+              child: Row(
+                children: [
+                  if (opt.$1 == selectedScript)
+                    Icon(Icons.check, size: 18, color: colors.primary),
+                  if (opt.$1 == selectedScript) const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(opt.$2, overflow: TextOverflow.ellipsis),
+                  ),
+                ],
+              ),
+            ),
+        ],
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              selectedLabel,
+              style: AppTypography.labelSmall.copyWith(
+                color: colors.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(Icons.chevron_right, color: colors.onSurfaceVariant, size: 18),
+          ],
+        ),
       ),
     );
   }

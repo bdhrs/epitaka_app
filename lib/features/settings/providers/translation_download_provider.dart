@@ -21,7 +21,14 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/utils/database_initializer.dart';
 
 /// Download state for a specific translation version.
-enum DownloadStatus { idle, downloading, extracting, completed, cancelled, error }
+enum DownloadStatus {
+  idle,
+  downloading,
+  extracting,
+  completed,
+  cancelled,
+  error,
+}
 
 class TranslationDownloadState {
   final DownloadStatus status;
@@ -91,9 +98,7 @@ class TranslationDownloadNotifier
     Directory? dbDir,
   }) async {
     final prefs = await SharedPreferences.getInstance();
-    final saved = prefs.getString(
-      'version_updated_${versionKeyFor(version)}',
-    );
+    final saved = prefs.getString('version_updated_${versionKeyFor(version)}');
     if (saved != null && saved.isNotEmpty) return saved;
     return _fileModifiedDate(version, dbDir: dbDir);
   }
@@ -109,6 +114,7 @@ class TranslationDownloadNotifier
       final dir = dbDir ?? await getDatabaseDirectory();
       final file = File(p.join(dir.path, version.filename));
       if (!await file.exists()) return null;
+      if (await file.length() == 0) return null;
       final stat = await file.stat();
       final t = stat.modified;
       return '${t.year.toString().padLeft(4, '0')}-'
@@ -145,10 +151,7 @@ class TranslationDownloadNotifier
   /// The foreground service itself is ref-counted per owner (downloads vs
   /// translation runs), so multiple downloads and a translation run sharing
   /// the process keep each other alive until the last one finishes.
-  Future<bool> _fgsStart({
-    required String title,
-    required String text,
-  }) async {
+  Future<bool> _fgsStart({required String title, required String text}) async {
     return DownloadForegroundService.instance.showDownload(
       title: title,
       text: text,
@@ -319,7 +322,9 @@ class TranslationDownloadNotifier
       // Extract the .db from the zip.
       state = {
         ...state,
-        versionKey: const TranslationDownloadState(status: DownloadStatus.extracting),
+        versionKey: const TranslationDownloadState(
+          status: DownloadStatus.extracting,
+        ),
       };
       if (fgsActive) {
         DownloadForegroundService.instance.updateDownload(
@@ -392,10 +397,7 @@ class TranslationDownloadNotifier
       final tempPath = '$destPath.tmp';
       final tempFile = File(tempPath);
 
-      await tempFile.writeAsBytes(
-        dbEntry.content as List<int>,
-        flush: true,
-      );
+      await tempFile.writeAsBytes(dbEntry.content as List<int>, flush: true);
 
       final writtenSize = await tempFile.length();
       if (writtenSize == 0) {
@@ -433,8 +435,7 @@ class TranslationDownloadNotifier
       // Auto-enable the newly downloaded translation so the user doesn't
       // have to manually toggle it on after waiting for the download.
       final settingsState = ref.read(settingsProvider);
-      if (!settingsState.enabledTranslations
-          .contains(version.languageCode)) {
+      if (!settingsState.enabledTranslations.contains(version.languageCode)) {
         await ref
             .read(settingsProvider.notifier)
             .setTranslationEnabled(version.languageCode, true);
@@ -594,10 +595,7 @@ class TranslationDownloadNotifier
       final tempPath = '$destPath.tmp';
       final tempFile = File(tempPath);
 
-      await tempFile.writeAsBytes(
-        dbEntry.content as List<int>,
-        flush: true,
-      );
+      await tempFile.writeAsBytes(dbEntry.content as List<int>, flush: true);
 
       final writtenSize = await tempFile.length();
       if (writtenSize == 0) {
@@ -681,8 +679,7 @@ class TranslationDownloadNotifier
 
 /// Case-insensitive hex comparison for SHA-256 strings (the server emits
 /// lowercase; keep the comparison forgiving).
-bool _hexEquals(String a, String b) =>
-    a.toLowerCase() == b.toLowerCase();
+bool _hexEquals(String a, String b) => a.toLowerCase() == b.toLowerCase();
 
 /// Verify downloaded database content against the manifest.
 ///
@@ -722,7 +719,8 @@ class CancelableCompleter {
   }
 }
 
-final translationDownloadProvider = StateNotifierProvider<
-    TranslationDownloadNotifier, Map<String, TranslationDownloadState>>(
-  (ref) => TranslationDownloadNotifier(),
-);
+final translationDownloadProvider =
+    StateNotifierProvider<
+      TranslationDownloadNotifier,
+      Map<String, TranslationDownloadState>
+    >((ref) => TranslationDownloadNotifier());

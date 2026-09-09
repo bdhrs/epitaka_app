@@ -285,13 +285,13 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
   }
 
   /// Open the outline (every section with its study guide) of the current
-  /// book as a full reading view. Desktop keeps the dockable contents panel
-  /// (which hosts the outline button) instead of pushing over the shell.
+  /// book as a full reading view. Desktop opens the dockable outline
+  /// sidebar panel instead of pushing over the shell.
   void _handleToolbarOutline() {
     final activeTab = _toolbarActiveTab();
     if (activeTab == null) return;
     if (ResponsiveBreakpoint.isDesktop(context)) {
-      ref.read(sidePanelProvider.notifier).toggle(SidePanelType.contents);
+      ref.read(sidePanelProvider.notifier).toggle(SidePanelType.outline);
       return;
     }
     final readerState = _toolbarReaderState(activeTab);
@@ -1093,8 +1093,7 @@ class _ReaderScreenState extends ConsumerState<ReaderScreen>
     // desktop shell. While it's open, the floating pill and the TTS chip
     // are hidden so nothing overlaps it.
     final dictDockOpen =
-        ref.watch(sidePanelProvider).left.openPanel ==
-        SidePanelType.dictionary;
+        ref.watch(sidePanelProvider).left.openPanel == SidePanelType.dictionary;
 
     // Inside the desktop shell, the attached status bar drives the reader's
     // toolbar actions through this scope; the floating pill is hidden and

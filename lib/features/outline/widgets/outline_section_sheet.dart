@@ -17,6 +17,7 @@
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart' show SelectedContent;
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -24,11 +25,13 @@ import '../../../core/providers/settings_provider.dart';
 import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/app_localizations.dart';
+import '../../../core/utils/native_lookup_service.dart';
 import '../../../shared/services/paragraph_preview_loader.dart';
 import '../../../shared/utils/app_navigation.dart';
 import '../../../shared/widgets/ai_markdown_view.dart';
 import '../../../shared/widgets/pali_text.dart';
 import '../../../shared/widgets/preview_content.dart';
+import '../../../shared/widgets/wide_bottom_sheet.dart';
 import '../../ai_qa/services/citation_quickview.dart';
 import '../../dictionary/widgets/dictionary_open.dart';
 import '../../reader/providers/reader_tabs_provider.dart';
@@ -79,6 +82,9 @@ Future<void> showOutlineSectionSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // Wide screens: span 80% of the app instead of the 640 px default cap,
+    // same as the book-link preview sheet.
+    constraints: wideBottomSheetConstraints(context),
     builder: (_) => _OutlineSectionSheet(
       bookId: bookId,
       bookName: bookName,
@@ -108,6 +114,10 @@ class _OutlineSectionSheet extends ConsumerStatefulWidget {
 
 class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
   int _tab = 0; // 0 = text excerpt, 1 = study guide
+
+  /// Track the last text selection for the context menu's dictionary lookup
+  /// (same as the book-link preview sheet).
+  SelectedContent? _lastSelectedContent;
 
   StudyGuideQuery get _studyGuideQuery =>
       StudyGuideQuery(bookId: widget.bookId, sectionId: widget.item.paraId);
@@ -195,18 +205,31 @@ class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        PaliTextStatic(
-                          item.title.isNotEmpty
-                              ? item.title
-                              : '${loc.section} ${item.paraId}',
-                          script,
-                          style: AppTypography.labelSmall.copyWith(
-                            color: colors.primary,
-                            fontWeight: FontWeight.w600,
+                        if (item.translated)
+                          Text(
+                            item.title.isNotEmpty
+                                ? item.title
+                                : '${loc.section} ${item.paraId}',
+                            style: AppTypography.labelSmall.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          )
+                        else
+                          PaliTextStatic(
+                            item.title.isNotEmpty
+                                ? item.title
+                                : '${loc.section} ${item.paraId}',
+                            script,
+                            style: AppTypography.labelSmall.copyWith(
+                              color: colors.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
                         if (widget.bookName.isNotEmpty)
                           PaliTextStatic(
                             widget.bookName,
@@ -296,6 +319,69 @@ class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
     );
   }
 
+  /// Context menu shown when the user selects text inside the preview,
+  /// same as the book-link preview sheet: dictionary search, native
+  /// lookup, copy, select all.
+  Widget _selectionContextMenu(
+    BuildContext context,
+    SelectableRegionState selectableRegionState,
+  ) {
+    final loc = AppLocalizations.of(context);
+    TextSelectionToolbarAnchors anchors;
+    try {
+      anchors = selectableRegionState.contextMenuAnchors;
+    } catch (_) {
+      anchors = const TextSelectionToolbarAnchors(primaryAnchor: Offset.zero);
+    }
+
+    final raw = _lastSelectedContent?.plainText;
+    final searchable = raw == null || raw.trim().isEmpty
+        ? null
+        : raw.replaceAll('\uFFFC', ' ').replaceAll(RegExp(r'\s+'), ' ').trim();
+
+    return AdaptiveTextSelectionToolbar.buttonItems(
+      anchors: anchors,
+      buttonItems: [
+        if (searchable != null)
+          ContextMenuButtonItem(
+            label: '${loc.search} "${_truncateLabel(searchable)}"',
+            onPressed: () {
+              selectableRegionState.clearSelection();
+              // Stack the dictionary on top of this sheet (forceSheet) so
+              // closing it returns to the section being read here.
+              openDictionaryInPanel(context, ref, searchable, forceSheet: true);
+            },
+          ),
+        if (searchable != null && NativeLookupService.isSupported)
+          ContextMenuButtonItem(
+            label: '${loc.lookUp} "${_truncateLabel(searchable)}"',
+            onPressed: () {
+              selectableRegionState.clearSelection();
+              NativeLookupService.lookUp(searchable);
+            },
+          ),
+        ContextMenuButtonItem(
+          label: loc.copy,
+          onPressed: () {
+            final text = _lastSelectedContent?.plainText;
+            if (text != null && text.isNotEmpty) {
+              Clipboard.setData(ClipboardData(text: text));
+            }
+            selectableRegionState.clearSelection();
+          },
+        ),
+        ContextMenuButtonItem(
+          label: loc.selectAll,
+          onPressed: () =>
+              selectableRegionState.selectAll(SelectionChangedCause.toolbar),
+        ),
+      ],
+    );
+  }
+
+  static String _truncateLabel(String s) =>
+      s.length <= 28 ? s : '${s.substring(0, 28)}\u2026';
+
   Widget _buildBody(
     int tab,
     ColorScheme colors,
@@ -332,22 +418,38 @@ class _OutlineSectionSheetState extends ConsumerState<_OutlineSectionSheet> {
               ),
             ),
             const SizedBox(height: 6),
-            PaliTextStatic(
-              widget.item.title,
-              script,
-              style: AppTypography.bodyPali.copyWith(
-                fontWeight: FontWeight.w600,
-                color: colors.primary,
+            if (widget.item.translated)
+              Text(
+                widget.item.title,
+                style: AppTypography.bodyTranslation.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colors.primary,
+                ),
+              )
+            else
+              PaliTextStatic(
+                widget.item.title,
+                script,
+                style: AppTypography.bodyPali.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: colors.primary,
+                ),
               ),
-            ),
             const SizedBox(height: 16),
           ],
-          PreviewContent(
-            lines: preview.lines,
-            highlightParaId: widget.item.paraId,
-            onPaliWordTap: (word) {
-              openDictionaryInPanel(context, ref, word, closeSheet: true);
+          SelectionArea(
+            onSelectionChanged: (content) {
+              _lastSelectedContent = content;
             },
+            contextMenuBuilder: (context, selectableRegionState) =>
+                _selectionContextMenu(context, selectableRegionState),
+            child: PreviewContent(
+              lines: preview.lines,
+              highlightParaId: widget.item.paraId,
+              onPaliWordTap: (word) {
+                openDictionaryInPanel(context, ref, word, closeSheet: true);
+              },
+            ),
           ),
         ],
       ),

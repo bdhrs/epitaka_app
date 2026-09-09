@@ -12,9 +12,11 @@ import '../../../core/utils/pali_script_converter.dart';
 import '../../../router/app_router.dart' show AppRoutes;
 import '../../search/providers/search_provider.dart';
 import '../../ai_qa/widgets/ai_qa_settings_sheet.dart';
+import '../../mcp/widgets/mcp_settings_tile.dart';
 
 import '../widgets/index_progress_screen.dart';
 import '../widgets/tiles/reset_data_tile.dart';
+import '../widgets/tiles/storage_location_tile.dart';
 import '../widgets/settings_app_bar.dart';
 import '../widgets/settings_section.dart';
 
@@ -233,6 +235,7 @@ class SettingsAiSection extends ConsumerWidget {
           subtitle: loc.aiQaSettingsSubtitle,
           onTap: () => showAiQaSettingsSheet(context),
         ),
+        const McpSettingsTile(),
       ],
     );
   }
@@ -286,6 +289,7 @@ class SettingsSystemSection extends StatelessWidget {
           subtitle: loc.keyboardShortcuts,
           onTap: () => context.push('/settings/help'),
         ),
+        const StorageLocationTile(),
         ResetDataTile(),
         _SettingsTile(icon: Icons.info, title: loc.about, onTap: () {}),
       ],

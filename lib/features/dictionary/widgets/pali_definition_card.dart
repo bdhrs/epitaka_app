@@ -74,12 +74,17 @@ class PaliDefinitionCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Header row: book id + open-book button
+            // Header row: book name + open-book button
             Row(
               children: [
                 Expanded(
                   child: Text(
-                    entry.bookId,
+                    ref
+                            .watch(canonBookNamesProvider)
+                            .valueOrNull?[entry.bookId] ??
+                        entry.bookId,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
@@ -210,12 +215,15 @@ class PaliDefinitionCard extends ConsumerWidget {
 
   void _openBook(BuildContext context, WidgetRef ref) {
     final entry = result.entry;
+    final bookName =
+        ref.read(canonBookNamesProvider).valueOrNull?[entry.bookId] ??
+        entry.bookId;
     ref
         .read(readerTabsProvider.notifier)
         .openTab(
           ReaderTabInfo(
             bookId: entry.bookId,
-            bookName: entry.bookId,
+            bookName: bookName,
             initialParaId: entry.paraId,
             initialLineId: entry.lineId,
           ),
@@ -271,12 +279,7 @@ class _PaliDefinitionSectionState extends ConsumerState<PaliDefinitionSection> {
     final colors = widget.colors;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        AppDimensions.marginMobile,
-        AppDimensions.sm,
-        AppDimensions.marginMobile,
-        0,
-      ),
+      padding: const EdgeInsets.only(bottom: AppDimensions.sm),
       child: resultsAsync.when(
         // While loading, show the header + a small spinner.
         loading: () => Column(
@@ -316,11 +319,8 @@ class _PaliDefinitionSectionState extends ConsumerState<PaliDefinitionSection> {
                 _PaliMoreButton(
                   label: _expanded
                       ? AppLocalizations.of(context).lessLabel
-                      : AppLocalizations.of(context)
-                            .showNMore(hiddenCount),
-                  icon: _expanded
-                      ? Icons.expand_less
-                      : Icons.expand_more,
+                      : AppLocalizations.of(context).showNMore(hiddenCount),
+                  icon: _expanded ? Icons.expand_less : Icons.expand_more,
                   colors: colors,
                   onTap: () => setState(() => _expanded = !_expanded),
                 ),

@@ -8,6 +8,8 @@ import '../../../core/theme/app_dimensions.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../core/utils/pali_search_utils.dart';
+import '../../../core/utils/responsive_breakpoint.dart';
+import '../../../shared/providers/side_panel_provider.dart';
 import '../../../shared/widgets/pali_text.dart';
 import '../../reader/providers/reader_tabs_provider.dart';
 import '../providers/contents_provider.dart';
@@ -275,20 +277,26 @@ class _ContentsPanelState extends ConsumerState<ContentsPanel> {
                         // The outline is the full outline of the book —
                         // every section with its study guide — opened as a
                         // separate reading view.
-                        // IconButton(
-                        //   icon: const Icon(
-                        //     Icons.account_tree_outlined,
-                        //     size: 18,
-                        //   ),
-                        //   color: colors.onSurfaceVariant,
-                        //   tooltip: loc.outline,
-                        //   onPressed: () {
-                        //     if (_effectiveBookId.isEmpty) return;
-                        //     context.push(
-                        //       '/outline/$_effectiveBookId?bookName=${Uri.encodeComponent(_effectiveBookName)}',
-                        //     );
-                        //   },
-                        // ),
+                        IconButton(
+                          icon: const Icon(
+                            Icons.account_tree_outlined,
+                            size: 18,
+                          ),
+                          color: colors.onSurfaceVariant,
+                          tooltip: loc.outline,
+                          onPressed: () {
+                            if (_effectiveBookId.isEmpty) return;
+                            if (ResponsiveBreakpoint.isDesktop(context)) {
+                              ref
+                                  .read(sidePanelProvider.notifier)
+                                  .toggle(SidePanelType.outline);
+                              return;
+                            }
+                            context.push(
+                              '/outline/$_effectiveBookId?bookName=${Uri.encodeComponent(_effectiveBookName)}',
+                            );
+                          },
+                        ),
                         IconButton(
                           icon: Icon(Icons.search, size: 18),
                           color: colors.onSurfaceVariant,

@@ -29,11 +29,7 @@ class OutlineScreen extends ConsumerStatefulWidget {
   final String bookId;
   final String bookName;
 
-  const OutlineScreen({
-    super.key,
-    required this.bookId,
-    this.bookName = '',
-  });
+  const OutlineScreen({super.key, required this.bookId, this.bookName = ''});
 
   @override
   ConsumerState<OutlineScreen> createState() => _OutlineScreenState();
@@ -108,18 +104,14 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen> {
         // Search: flat match list, no group/sutta headers.
         if (query.isNotEmpty) {
           for (final item in sutta.items) {
-            if (normalizePaliFuzzy(item.title)
-                .toLowerCase()
-                .contains(query)) {
+            if (normalizePaliFuzzy(item.title).toLowerCase().contains(query)) {
               rows.add(_ItemRow(item: item));
             }
           }
           continue;
         }
 
-        final visibleItems = suttaCollapsed
-            ? <OutlineItem>[]
-            : sutta.items;
+        final visibleItems = suttaCollapsed ? <OutlineItem>[] : sutta.items;
         if (sutta.title.isNotEmpty && visibleItems.isNotEmpty) {
           rows.add(_SuttaRow(title: sutta.title));
         } else if (sutta.title.isEmpty && visibleItems.isNotEmpty) {
@@ -159,7 +151,9 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen> {
             PaliTextStatic(
               widget.bookName.isEmpty ? widget.bookId : widget.bookName,
               ref.watch(settingsProvider).paliScript,
-              style: AppTypography.headlineSmall.copyWith(color: colors.primary),
+              style: AppTypography.headlineSmall.copyWith(
+                color: colors.primary,
+              ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
@@ -200,10 +194,7 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen> {
           }
 
           final rows = _buildRows(groups);
-          final total = groups.fold<int>(
-            0,
-            (sum, g) => sum + g.itemCount,
-          );
+          final total = groups.fold<int>(0, (sum, g) => sum + g.itemCount);
 
           return Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -239,8 +230,7 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen> {
                           bottom: AppDimensions.xxl,
                         ),
                         itemCount: rows.length,
-                        itemBuilder: (context, i) =>
-                            _buildRow(rows[i], colors),
+                        itemBuilder: (context, i) => _buildRow(rows[i], colors),
                       ),
               ),
             ],
@@ -253,24 +243,24 @@ class _OutlineScreenState extends ConsumerState<OutlineScreen> {
   Widget _buildRow(_Row row, ColorScheme colors) {
     return switch (row) {
       _GroupRow(:final group, :final index) => _GroupHeader(
-          title: group.title.isEmpty ? widget.bookName : group.title,
-          count: group.itemCount,
-          collapsed: _collapsedGroups.contains(index),
-          colors: colors,
-          onTap: () {
-            setState(() {
-              if (!_collapsedGroups.remove(index)) {
-                _collapsedGroups.add(index);
-              }
-            });
-          },
-        ),
+        title: group.title.isEmpty ? widget.bookName : group.title,
+        count: group.itemCount,
+        collapsed: _collapsedGroups.contains(index),
+        colors: colors,
+        onTap: () {
+          setState(() {
+            if (!_collapsedGroups.remove(index)) {
+              _collapsedGroups.add(index);
+            }
+          });
+        },
+      ),
       _SuttaRow(:final title) => _SuttaLabel(title: title, colors: colors),
       _ItemRow(:final item) => _ItemTile(
-          item: item,
-          colors: colors,
-          onTap: () => _openItem(item),
-        ),
+        item: item,
+        colors: colors,
+        onTap: () => _openItem(item),
+      ),
     };
   }
 }
@@ -324,7 +314,12 @@ class _OutlineHeader extends ConsumerWidget {
     final pad = isPhone ? AppDimensions.md : AppDimensions.lg;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(pad, AppDimensions.md, pad, AppDimensions.sm),
+      padding: EdgeInsets.fromLTRB(
+        pad,
+        AppDimensions.md,
+        pad,
+        AppDimensions.sm,
+      ),
       child: searchActive
           ? TextField(
               controller: searchController,
@@ -549,15 +544,24 @@ class _ItemTile extends ConsumerWidget {
             ),
             const SizedBox(width: 10),
             Expanded(
-              child: PaliTextStatic(
-                item.title.isEmpty ? '—' : item.title,
-                script,
-                style: AppTypography.bodyTranslation.copyWith(
-                  color: colors.onSurface,
-                  fontSize: 14,
-                  height: 1.4,
-                ),
-              ),
+              child: item.translated
+                  ? Text(
+                      item.title.isEmpty ? '—' : item.title,
+                      style: AppTypography.bodyTranslation.copyWith(
+                        color: colors.onSurface,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    )
+                  : PaliTextStatic(
+                      item.title.isEmpty ? '—' : item.title,
+                      script,
+                      style: AppTypography.bodyTranslation.copyWith(
+                        color: colors.onSurface,
+                        fontSize: 14,
+                        height: 1.4,
+                      ),
+                    ),
             ),
             const SizedBox(width: 8),
             Icon(

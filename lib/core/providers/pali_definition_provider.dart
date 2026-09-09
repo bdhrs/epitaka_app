@@ -97,6 +97,30 @@ class PaliDefinitionResult {
   });
 }
 
+// ── Canon book names (cached) ─────────────────────────────────────────────
+
+/// Cached map of canon `book_id` → full `book_name` from the `books` table.
+///
+/// The table is small, so the whole map is loaded once and kept cached
+/// instead of querying per card. Used to show full book names (e.g. in
+/// bold-definition cards) instead of raw ids. Falls back to the id itself
+/// when a name is missing.
+final canonBookNamesProvider = FutureProvider<Map<String, String>>((ref) async {
+  try {
+    final db = await ref.watch(epitakaDbProvider.future);
+    final rows = await db
+        .customSelect('SELECT book_id, book_name FROM books')
+        .get();
+    return {
+      for (final r in rows)
+        (r.data['book_id'] as String):
+            (r.data['book_name'] as String?) ?? (r.data['book_id'] as String),
+    };
+  } catch (_) {
+    return {};
+  }
+});
+
 // ── Provider ───────────────────────────────────────────────────────────────
 
 /// Pāli length below which we pull the surrounding context lines.
@@ -208,8 +232,9 @@ final paliDefinitionProvider = FutureProvider.autoDispose
         for (final code in langCodes) {
           if (TranslationFilenameParser.isNissaya(code)) {
             final filename = TranslationFilenameParser.build(code);
-            final nissayaDb =
-                await ref.read(nissayaDbByFilenameProvider(filename).future);
+            final nissayaDb = await ref.read(
+              nissayaDbByFilenameProvider(filename).future,
+            );
             if (nissayaDb != null) {
               for (final p in paraIds) {
                 final sentences = await nissayaDb.getSentences(bookId, p);
@@ -223,9 +248,7 @@ final paliDefinitionProvider = FutureProvider.autoDispose
               }
             }
           } else {
-            final transDb = await ref.read(
-              translationDbProvider(code).future,
-            );
+            final transDb = await ref.read(translationDbProvider(code).future);
             if (transDb == null) continue;
             final transRows = await transDb
                 .customSelect(

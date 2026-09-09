@@ -426,6 +426,7 @@ const Map<String, String> en = {
   'Pāli voice': 'Pāli voice',
   'Translation voice': 'Translation voice',
   'Hindi voice not installed': 'Hindi voice not installed',
+  'voice not installed': 'voice not installed',
   'Hindi voice missing desc':
       'A Hindi (Devanagari) voice is needed to read Pāli aloud. '
       'Install one in your device Text-to-Speech settings.',
@@ -829,6 +830,13 @@ const Map<String, String> en = {
   'Reset Now': 'Reset Now',
   'Backup saved to: ': 'Backup saved to: ',
   'Failed to export data: ': 'Failed to export data: ',
+  'Database folder': 'Database folder',
+  'Open folder': 'Open folder',
+  'Copy path': 'Copy path',
+  'Path copied to clipboard': 'Path copied to clipboard',
+  'Could not open folder: ': 'Could not open folder: ',
+  'Loading databases…': 'Loading databases…',
+  'No databases found.': 'No databases found.',
 
   // ── Feedback ────────────────────────────────────────────────────────
   'Send Feedback': 'Send Feedback',
@@ -1067,4 +1075,9 @@ const Map<String, String> en = {
 
   // ── App shell ───────────────────────────────────────────────────────
   'Listen': 'Listen',
+
+  // ── AI error card ───────────────────────────────────────────────────
+  'Search Google': 'Search Google',
+  'Show full error': 'Show full error',
+  'Hide full error': 'Hide full error',
 };

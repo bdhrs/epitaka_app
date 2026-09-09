@@ -30,6 +30,7 @@ class DownloadNotificationService {
   static const int _gavesanaNotificationId = 1002;
   static const int _supertonicNotificationId = 1003;
   static const int _translatorRunNotificationId = 1004;
+  static const int _indexBuildNotificationId = 1005;
 
   /// Must be called once at app startup (e.g. in [main] or app init).
   Future<void> init() async {
@@ -271,6 +272,76 @@ class DownloadNotificationService {
   /// Dismiss the translation-run notification.
   void dismissTranslatorRun() {
     _safeCancel(_translatorRunNotificationId);
+  }
+
+  // ── Search-index build notifications ─────────────────────────────────
+
+  /// Show or update the ongoing index-build progress notification.
+  void showIndexProgress({
+    required String title,
+    String? body,
+    required double progress,
+    bool isIndeterminate = false,
+  }) {
+    final pct = (progress * 100).round().clamp(0, 100);
+    final androidDetails = _androidChannel(
+      'index_build',
+      'Search Index',
+      ongoing: true,
+      showProgress: !isIndeterminate,
+      maxProgress: 100,
+      currentProgress: pct,
+      indeterminate: isIndeterminate,
+    );
+    _safeShow(
+      _indexBuildNotificationId,
+      title,
+      body ?? (isIndeterminate ? null : '$pct%'),
+      NotificationDetails(android: androidDetails),
+    );
+  }
+
+  /// Mark the index build as finished (brief "done" then auto-dismiss).
+  void showIndexComplete(String title, String body) {
+    final androidDetails = _androidChannel(
+      'index_build',
+      'Search Index',
+      ongoing: false,
+      showProgress: false,
+    );
+    _safeShow(
+      _indexBuildNotificationId,
+      title,
+      body,
+      NotificationDetails(android: androidDetails),
+    );
+    Future.delayed(const Duration(seconds: 4), () {
+      _safeCancel(_indexBuildNotificationId);
+    });
+  }
+
+  /// Show an index-build error.
+  void showIndexError(String title, String body) {
+    final androidDetails = _androidChannel(
+      'index_build',
+      'Search Index',
+      ongoing: false,
+      showProgress: false,
+    );
+    _safeShow(
+      _indexBuildNotificationId,
+      title,
+      body,
+      NotificationDetails(android: androidDetails),
+    );
+    Future.delayed(const Duration(seconds: 8), () {
+      _safeCancel(_indexBuildNotificationId);
+    });
+  }
+
+  /// Dismiss the index-build notification.
+  void dismissIndex() {
+    _safeCancel(_indexBuildNotificationId);
   }
 
   // ── Low-level helpers ────────────────────────────────────────────────

@@ -289,9 +289,7 @@ class AppShortcuts {
     ShortcutBinding(
       id: 'tab-next',
       label: 'Next Tab',
-      activators: [
-        SingleActivator(LogicalKeyboardKey.tab, control: true),
-      ],
+      activators: [SingleActivator(LogicalKeyboardKey.tab, control: true)],
     ),
     ShortcutBinding(
       id: 'tab-prev',
@@ -337,6 +335,19 @@ class AppShortcuts {
       ],
       macActivator: SingleActivator(
         LogicalKeyboardKey.keyC,
+        meta: true,
+        shift: true,
+      ),
+    ),
+    ShortcutBinding(
+      id: 'outline',
+      label: 'Outline',
+      activators: [
+        SingleActivator(LogicalKeyboardKey.keyO, control: true, shift: true),
+        SingleActivator(LogicalKeyboardKey.keyO, meta: true, shift: true),
+      ],
+      macActivator: SingleActivator(
+        LogicalKeyboardKey.keyO,
         meta: true,
         shift: true,
       ),
@@ -579,10 +590,7 @@ class AppShortcuts {
       if (sidePanels.left.openPanel == panel) {
         ref.read(sidePanelProvider.notifier).close(panel);
       } else {
-        ref.read(sidePanelProvider.notifier).open(
-          panel,
-          autoFocus: autoFocus,
-        );
+        ref.read(sidePanelProvider.notifier).open(panel, autoFocus: autoFocus);
       }
     }
 
@@ -614,6 +622,21 @@ class AppShortcuts {
         // History lives inside the library (Reading tab) on mobile.
         context.go(AppRoutes.library);
       }
+    }
+
+    void toggleOutline() {
+      final context = _ctx(navigatorKey);
+      if (ResponsiveBreakpoint.isDesktop(context)) {
+        toggleSidebarPanel(SidePanelType.outline, autoFocus: true);
+        return;
+      }
+      final activeTab = ref.read(readerTabsProvider).activeTab;
+      if (activeTab == null) return;
+      final readerState = ref.read(readerDataProvider(activeTab.bookId));
+      context.push(
+        '/outline/${activeTab.bookId}'
+        '?bookName=${Uri.encodeComponent(readerState.bookName ?? activeTab.bookId)}',
+      );
     }
 
     void toggleContents() {
@@ -652,13 +675,9 @@ class AppShortcuts {
           ?.itemPositions
           .value;
       final context = _ctx(navigatorKey);
-      ref.read(readerActionControllerProvider).onJumpTap(
-            context,
-            ref,
-            positions,
-            activeTab,
-            readerState,
-          );
+      ref
+          .read(readerActionControllerProvider)
+          .onJumpTap(context, ref, positions, activeTab, readerState);
     }
 
     void hideTranslation() {
@@ -707,6 +726,7 @@ class AppShortcuts {
       'annotations': toggleAnnotations,
       'history': toggleHistory,
       'contents': toggleContents,
+      'outline': toggleOutline,
       'vimamsa': toggleVimamsa,
       'jump': jumpToPage,
       'display-hide': hideTranslation,

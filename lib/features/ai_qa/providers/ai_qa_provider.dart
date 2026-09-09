@@ -70,14 +70,48 @@ class AiQaNotifier extends StateNotifier<AiQaState> {
   StreamSubscription<String>? _streamSubscription;
   String? _currentStreamingMessageId;
   bool _finalized = false;
+  http.Client? _activeStreamClient;
+
+  /// Completes when the current answer stream settles (data done or error).
+  /// Kept as a field so stopGeneration()/startNewThread()/loadThread() can
+  /// release a sendMessage() stuck in `await streamDone.future`.
+  Completer<void>? _activeStreamDone;
+
+  void _completeStreamDone() {
+    final done = _activeStreamDone;
+    _activeStreamDone = null;
+    if (done != null && !done.isCompleted) done.complete();
+  }
+
+  /// Set the moment the user presses Stop. Checked between pipeline phases
+  /// so a stop during the search (tool loop) phase halts immediately
+  /// instead of continuing into answer generation.
+  bool _cancelRequested = false;
+  Completer<void> _cancelSignal = Completer<void>();
+
+  /// Latest tool logs, kept as a field so stopGeneration() can preserve
+  /// them in the UI even when stopped mid-search.
+  List<ToolCallLog> _currentToolLogs = [];
 
   /// DB ID of the last assistant message (for stream finalization updates).
   int? _dbMessageId;
 
   static const _encoder = JsonEncoder.withIndent('  ');
 
-  static const int _maxToolIterations =
-      8; // ── Debug log ──────────────────────────────────────────────────────────
+  static const int _maxToolIterations = 8;
+
+  /// Connect timeout for opening the answer stream. Without this a stalled
+  /// connection leaves the "Generating answer..." bubble spinning forever.
+  static const Duration _streamConnectTimeout = Duration(seconds: 5 * 60);
+
+  /// Idle timeout: if the server sends no bytes for this long mid-stream,
+  /// abort so the failure surfaces as an error instead of hanging.
+  static const Duration _streamIdleTimeout = Duration(seconds: 120);
+
+  /// Hard cap on the whole answer-streaming phase (failsafe).
+  static const Duration _answerTotalTimeout = Duration(minutes: 10);
+
+  // ── Debug log ──────────────────────────────────────────────────────────
 
   /// Debug log data collected during the current pipeline run.
   Map<String, dynamic> _debugLog = {};
@@ -151,8 +185,17 @@ $grounding''';
   /// Create a new thread and set it as active.
   Future<void> startNewThread({String? title}) async {
     // Cancel any ongoing stream
+    _cancelRequested = true;
+    if (!_cancelSignal.isCompleted) _cancelSignal.complete();
     await _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _activeStreamClient?.close();
+    _activeStreamClient = null;
+    _completeStreamDone();
     _finalized = false;
+    _cancelRequested = false;
+    _cancelSignal = Completer<void>();
+    _currentToolLogs = [];
 
     final threadId = _uuid.v4();
     final threadTitle = title ?? 'Vīmaṃsā';
@@ -171,8 +214,17 @@ $grounding''';
 
   /// Load an existing thread's messages into the chat state.
   Future<void> loadThread(String threadId) async {
+    _cancelRequested = true;
+    if (!_cancelSignal.isCompleted) _cancelSignal.complete();
     await _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _activeStreamClient?.close();
+    _activeStreamClient = null;
+    _completeStreamDone();
     _finalized = false;
+    _cancelRequested = false;
+    _cancelSignal = Completer<void>();
+    _currentToolLogs = [];
 
     final notifier = _ref.read(chatHistoryNotifierProvider);
     final thread = await notifier.getThread(threadId);
@@ -266,6 +318,13 @@ $grounding''';
     if (trimmed.isEmpty) return;
 
     await _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _activeStreamClient?.close();
+    _activeStreamClient = null;
+    _completeStreamDone();
+    _cancelRequested = false;
+    _cancelSignal = Completer<void>();
+    _currentToolLogs = [];
 
     // ── Ensure we have an active thread ────────────────────────────
     String? threadId = _ref.read(currentThreadIdProvider);
@@ -428,7 +487,6 @@ $grounding''';
           : _defaultToolSystemPrompt;
 
       // Tool loop — shared engine (see ai_api_client.dart)
-      // Tool loop — shared engine (see ai_api_client.dart)
       final loopResult = await runAiToolLoop(
         settings: settings,
         systemPrompt: systemPrompt,
@@ -438,6 +496,8 @@ $grounding''';
           toolLogs
             ..clear()
             ..addAll(logs);
+          _currentToolLogs = [...toolLogs];
+          if (_cancelRequested) return;
           state = state.copyWith(
             messages: [
               ...state.messages.where((m) => m.id != 'thinking'),
@@ -455,7 +515,10 @@ $grounding''';
         },
         maxIterations: _maxToolIterations,
         logTag: 'Vīmaṃsā',
+        cancelSignal: _cancelSignal.future,
       );
+
+      if (_cancelRequested) return;
 
       // Record tool loop in debug log
       _debugLog['tool_loop'] = loopResult.debugToolSteps;
@@ -466,6 +529,7 @@ $grounding''';
       }).toList();
 
       // ── 3. Generate final answer ──────────────────────────────────
+      if (_cancelRequested) return;
       final answerSystemPrompt = settings.customSystemPrompt.isNotEmpty
           ? settings.customSystemPrompt
           : _buildAnswerSystemPrompt(orthodoxMode: settings.orthodoxMode);
@@ -537,48 +601,102 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
         _dbMessageId = null;
       }
 
-      // Stream final answer
-      final streamDone = Completer<void>();
+      // Stream final answer, with one automatic retry when the connection
+      // drops before the first token (e.g. "Connection closed before full
+      // header was received"). The retry is cheap: tool results are already
+      // collected, only the answer call is repeated.
       String accumulatedText = '';
       String? streamError;
-      final stream = _streamAnswer(
-        provider: settings.provider,
-        baseUrl: settings.baseUrl,
-        systemPrompt: answerSystemPrompt,
-        userPrompt: answerPrompt,
-        apiKey: settings.apiKey,
-        model: settings.answerModel,
-        maxTokens: settings.answerMaxTokens,
-      );
+      var attempt = 0;
+      while (true) {
+        attempt++;
+        final streamDone = Completer<void>();
+        _activeStreamDone = streamDone;
+        var retry = false;
+        final stream = _streamAnswer(
+          provider: settings.provider,
+          baseUrl: settings.baseUrl,
+          systemPrompt: answerSystemPrompt,
+          userPrompt: answerPrompt,
+          apiKey: settings.apiKey,
+          model: settings.answerModel,
+          maxTokens: settings.answerMaxTokens,
+        );
 
-      _streamSubscription = stream.listen(
-        (token) {
-          accumulatedText += token;
-          _ref.read(streamingTextProvider.notifier).state = accumulatedText;
-        },
-        onError: (error) {
-          debugPrint('[Vīmaṃsā] Stream error: $error');
-          streamError = AiApiClient.friendlyErrorMessage(error);
-          _finalizeMessage(accumulatedText, error: streamError);
-          if (!streamDone.isCompleted) streamDone.complete();
-        },
-        onDone: () {
-          // Guard: if the stream finished without producing any text AND no
-          // error was reported, surface a clear reason instead of leaving
-          // the user staring at a blank assistant bubble.
-          if (accumulatedText.trim().isEmpty && streamError == null) {
-            streamError =
-                'The model returned an empty response. This can happen when '
-                'the AI blocks the output or the question is too long. '
-                'Try asking again or check the model name in Settings.';
-          }
-          _finalizeMessage(accumulatedText, error: streamError);
-          if (!streamDone.isCompleted) streamDone.complete();
-        },
-        cancelOnError: false,
-      );
+        _streamSubscription = stream.listen(
+          (token) {
+            if (_cancelRequested) return;
+            accumulatedText += token;
+            _ref.read(streamingTextProvider.notifier).state = accumulatedText;
+          },
+          onError: (error) {
+            if (_cancelRequested || error is AiCallCancelledException) {
+              _finalizeMessage(accumulatedText);
+              if (!streamDone.isCompleted) streamDone.complete();
+              _activeStreamDone = null;
+              return;
+            }
+            if (accumulatedText.isEmpty &&
+                attempt == 1 &&
+                _isTransientStreamError(error)) {
+              debugPrint(
+                '[Vīmaṃsā] Answer stream dropped before first token, '
+                'retrying once: ${_redactKey('$error')}',
+              );
+              retry = true;
+              if (!streamDone.isCompleted) streamDone.complete();
+              _activeStreamDone = null;
+              return;
+            }
+            debugPrint('[Vīmaṃsā] Stream error: ${_redactKey('$error')}');
+            streamError = AiApiClient.friendlyErrorMessage(error);
+            _finalizeMessage(accumulatedText, error: streamError);
+            if (!streamDone.isCompleted) streamDone.complete();
+            _activeStreamDone = null;
+          },
+          onDone: () {
+            if (_cancelRequested) {
+              _finalizeMessage(accumulatedText);
+              if (!streamDone.isCompleted) streamDone.complete();
+              _activeStreamDone = null;
+              return;
+            }
+            if (accumulatedText.trim().isEmpty && streamError == null) {
+              streamError =
+                  'The model returned an empty response. This can happen when '
+                  'the AI blocks the output or the question is too long. '
+                  'Try asking again or check the model name in Settings.';
+            }
+            _finalizeMessage(accumulatedText, error: streamError);
+            if (!streamDone.isCompleted) streamDone.complete();
+            _activeStreamDone = null;
+          },
+          cancelOnError: false,
+        );
 
-      await streamDone.future;
+        try {
+          await streamDone.future.timeout(_answerTotalTimeout);
+        } on TimeoutException catch (_) {
+          await _streamSubscription?.cancel();
+          _streamSubscription = null;
+          _activeStreamClient?.close();
+          _activeStreamClient = null;
+          _activeStreamDone = null;
+          if (!streamDone.isCompleted) streamDone.complete();
+          throw TimeoutException(
+            'AI answer streaming timed out after $_answerTotalTimeout',
+          );
+        }
+        _activeStreamDone = null;
+        if (retry) {
+          await _streamSubscription?.cancel();
+          _streamSubscription = null;
+          if (_cancelRequested) return;
+          continue;
+        }
+        break;
+      }
+      if (_cancelRequested) return;
 
       // Update the assistant message in DB with the final content
       if (_dbMessageId != null && accumulatedText.isNotEmpty) {
@@ -602,26 +720,47 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       _debugLog['final_answer'] = accumulatedText;
       _debugLog['final_answer_length'] = accumulatedText.length;
 
-      debugPrint('');
-      debugPrint('╔══════════════════════════════════════════════════════════');
-      debugPrint('║  ANSWER COMPLETE');
-      debugPrint('╠══════════════════════════════════════════════════════════');
-      debugPrint('║  Total tokens received: ${accumulatedText.length} chars');
-      debugPrint('╚══════════════════════════════════════════════════════════');
-    } catch (e, stack) {
-      _debugLog['error'] = '$e';
-      _saveDebugLog();
-      debugPrint('[Vīmaṃsā] Error: $e\n$stack');
-      final friendlyError = AiApiClient.friendlyErrorMessage(e);
-      if (_finalized) {
-        // The stream already finished (e.g. DB save failure) — surface the
-        // reason instead of silently swallowing it.
-        state = state.copyWith(isLoading: false, error: friendlyError);
-      } else {
-        _finalizeMessage(
-          _ref.read(streamingTextProvider),
-          error: friendlyError,
+      if (streamError == null && accumulatedText.isNotEmpty) {
+        debugPrint('');
+        debugPrint(
+          '╔══════════════════════════════════════════════════════════',
         );
+        debugPrint('║  ANSWER COMPLETE');
+        debugPrint(
+          '╠══════════════════════════════════════════════════════════',
+        );
+        debugPrint('║  Total tokens received: ${accumulatedText.length} chars');
+        debugPrint(
+          '╚══════════════════════════════════════════════════════════',
+        );
+      } else {
+        debugPrint(
+          '[Vīmaṃsā] Answer failed after $attempt attempt(s): '
+          '${_redactKey(streamError ?? 'unknown error')}',
+        );
+      }
+    } on AiCallCancelledException {
+      _debugLog['cancelled'] = true;
+      _saveDebugLog();
+      debugPrint('[Vīmaṃsā] Cancelled by user');
+    } catch (e, stack) {
+      if (_cancelRequested) {
+        _debugLog['cancelled'] = true;
+        _saveDebugLog();
+        debugPrint('[Vīmaṃsā] Cancelled by user (in catch)');
+      } else {
+        _debugLog['error'] = _redactKey('$e');
+        _saveDebugLog();
+        debugPrint('[Vīmaṃsā] Error: ${_redactKey('$e')}\n$stack');
+        final friendlyError = AiApiClient.friendlyErrorMessage(e);
+        if (_finalized) {
+          state = state.copyWith(isLoading: false, error: friendlyError);
+        } else {
+          _finalizeMessage(
+            _ref.read(streamingTextProvider),
+            error: friendlyError,
+          );
+        }
       }
     }
 
@@ -700,8 +839,12 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       ..body = jsonEncode(payload);
 
     final httpClient = http.Client();
+    _activeStreamClient = httpClient;
     try {
-      final httpResponse = await httpClient.send(request);
+      final httpResponse = await AiApiClient.raceAiCancel(
+        httpClient.send(request).timeout(_streamConnectTimeout),
+        _cancelSignal.future,
+      );
 
       if (httpResponse.statusCode != 200) {
         final errorBody = await httpResponse.stream.bytesToString();
@@ -712,8 +855,10 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
 
       await for (final line
           in httpResponse.stream
+              .timeout(_streamIdleTimeout)
               .transform(utf8.decoder)
               .transform(const LineSplitter())) {
+        if (_cancelRequested) break;
         final trimmed = line.trim();
         if (!trimmed.startsWith('data: ')) continue;
         final data = trimmed.substring(6).trim();
@@ -741,8 +886,33 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       }
     } finally {
       httpClient.close();
+      if (identical(_activeStreamClient, httpClient)) {
+        _activeStreamClient = null;
+      }
     }
   }
+
+  /// True for network-level failures worth one automatic retry when no
+  /// answer tokens have arrived yet (dropped connection, stall timeout).
+  /// API rejections (4xx/5xx with a body) are NOT retried here.
+  static bool _isTransientStreamError(Object error) {
+    if (error is TimeoutException) return true;
+    if (error is SocketException) return true;
+    if (error is HttpException) return true;
+    if (error is http.ClientException) return true;
+    final lower = error.toString().toLowerCase();
+    return lower.contains('connection closed') ||
+        lower.contains('before full header') ||
+        lower.contains('connection reset') ||
+        lower.contains('connection refused') ||
+        lower.contains('failed host lookup') ||
+        lower.contains('network is unreachable') ||
+        lower.contains('timed out');
+  }
+
+  /// Scrub `key=...` query params so API keys never land in logs or UI text.
+  static String _redactKey(String s) =>
+      s.replaceAll(RegExp(r'key=[^&\s]+'), 'key=***');
 
   Uri _chatCompletionsUri(String baseUrl) {
     var value = baseUrl.trim();
@@ -783,8 +953,12 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       ..body = jsonEncode(payload);
 
     final httpClient = http.Client();
+    _activeStreamClient = httpClient;
     try {
-      final httpResponse = await httpClient.send(request);
+      final httpResponse = await AiApiClient.raceAiCancel(
+        httpClient.send(request).timeout(_streamConnectTimeout),
+        _cancelSignal.future,
+      );
 
       if (httpResponse.statusCode != 200) {
         final errorBody = await httpResponse.stream.bytesToString();
@@ -795,8 +969,10 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
 
       await for (final line
           in httpResponse.stream
+              .timeout(_streamIdleTimeout)
               .transform(utf8.decoder)
               .transform(const LineSplitter())) {
+        if (_cancelRequested) break;
         final trimmed = line.trim();
         if (!trimmed.startsWith('data: ')) continue;
         final data = trimmed.substring(6).trim();
@@ -821,6 +997,9 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       }
     } finally {
       httpClient.close();
+      if (identical(_activeStreamClient, httpClient)) {
+        _activeStreamClient = null;
+      }
     }
   }
 
@@ -906,9 +1085,10 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
       }
     }
 
-    // Remove the transient "thinking" placeholder on failure so the chat
-    // doesn't end on a stuck researching bubble.
-    if (error != null) {
+    // Remove the transient "thinking" placeholder on failure or when the
+    // streaming message took over, so the chat never ends on a stuck
+    // researching bubble.
+    if (error != null || messageId != null) {
       messages.removeWhere((m) => m.id == 'thinking');
     }
 
@@ -919,6 +1099,13 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
 
   /// Clear all messages and reset the active thread.
   void clearChat() {
+    _cancelRequested = true;
+    if (!_cancelSignal.isCompleted) _cancelSignal.complete();
+    _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _activeStreamClient?.close();
+    _activeStreamClient = null;
+    _completeStreamDone();
     _ref.read(currentThreadIdProvider.notifier).state = null;
     _ref.read(currentThreadTitleProvider.notifier).state = '';
     state = const AiQaState();
@@ -945,11 +1132,39 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
     }
   }
 
-  /// Stop the current generation (cancel streaming + finalize).
+  /// Stop the current generation immediately, whether in the search
+  /// (tool loop) phase or the answer streaming phase.
   void stopGeneration() {
+    if (!state.isLoading) return;
+    _cancelRequested = true;
+    if (!_cancelSignal.isCompleted) _cancelSignal.complete();
+    _activeStreamClient?.close();
+    _activeStreamClient = null;
     _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _completeStreamDone();
+
     final text = _ref.read(streamingTextProvider);
-    _finalizeMessage(text);
+    if (_currentStreamingMessageId != null) {
+      _finalizeMessage(text);
+    } else {
+      final messages = [...state.messages.where((m) => m.id != 'thinking')];
+      if (_currentToolLogs.isNotEmpty) {
+        messages.add(
+          AiQaMessage(
+            id: _uuid.v4(),
+            text: text,
+            isUser: false,
+            timestamp: DateTime.now(),
+            toolCalls: [..._currentToolLogs],
+          ),
+        );
+      }
+      _finalized = true;
+      state = state.copyWith(messages: messages, isLoading: false);
+      _ref.read(streamingTextProvider.notifier).state = '';
+      _ref.read(streamingMessageIdProvider.notifier).state = null;
+    }
   }
 
   /// Dismiss the current error.
@@ -959,7 +1174,11 @@ Format every citation as [book_id:para_id:line_id] so users can click to open th
 
   @override
   void dispose() {
+    if (!_cancelSignal.isCompleted) _cancelSignal.complete();
     _streamSubscription?.cancel();
+    _streamSubscription = null;
+    _activeStreamClient?.close();
+    _completeStreamDone();
     super.dispose();
   }
 }

@@ -28,6 +28,7 @@ enum SidePanelType {
 
   /// Translation Builder panel (desktop sidebar).
   translator,
+  outline,
 }
 
 /// Which slot a panel occupies.
@@ -215,6 +216,8 @@ class SidePanelNotifier extends StateNotifier<SidePanelsState> {
       case SidePanelType.translator:
         return PanelSlot.left;
       case SidePanelType.contents:
+        return PanelSlot.left;
+      case SidePanelType.outline:
         return PanelSlot.left;
       case SidePanelType.search:
         return PanelSlot.left;

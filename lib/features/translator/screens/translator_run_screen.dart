@@ -19,6 +19,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../core/models/translation_version.dart'
     show TranslationFilenameParser;
 import '../../../core/theme/app_dimensions.dart';
+import '../../shared/widgets/ai_error_card.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/database_initializer.dart';
 import '../../../core/utils/platform_info.dart';
@@ -75,7 +76,9 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
     required List<File> sources,
     required String confirmButtonText,
   }) async {
-    final dirPath = await getDirectoryPath(confirmButtonText: confirmButtonText);
+    final dirPath = await getDirectoryPath(
+      confirmButtonText: confirmButtonText,
+    );
     if (dirPath == null) return false;
     try {
       for (var i = 0; i < sources.length; i++) {
@@ -94,9 +97,11 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
     if (!mounted) return false;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(fileNames.length == 1
-            ? 'Saved ${fileNames.first} to $dirPath'
-            : 'Saved ${fileNames.length} files to $dirPath'),
+        content: Text(
+          fileNames.length == 1
+              ? 'Saved ${fileNames.first} to $dirPath'
+              : 'Saved ${fileNames.length} files to $dirPath',
+        ),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -133,7 +138,8 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
       ShareParams(
         files: [XFile(path, mimeType: 'application/octet-stream')],
         subject: 'ePitaka ${translatorLangName(settings.langCode)} translation',
-        text: 'ePitaka ${translatorLangName(settings.langCode)} translation '
+        text:
+            'ePitaka ${translatorLangName(settings.langCode)} translation '
             'database (epitaka_${settings.langCode}.db)',
       ),
     );
@@ -155,7 +161,9 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
     if (files.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('No prompt/response files yet — run at least one chunk.'),
+          content: Text(
+            'No prompt/response files yet — run at least one chunk.',
+          ),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -173,7 +181,8 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
       ShareParams(
         files: files,
         subject: 'ePitaka translation — last prompt & response',
-        text: 'Last chunk prompt and raw AI response for the '
+        text:
+            'Last chunk prompt and raw AI response for the '
             'Translation Builder.',
       ),
     );
@@ -280,25 +289,18 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
                     label: const Text('Manage translations'),
                   ),
                 ] else if (state.phase == TranslatorRunPhase.error) ...[
-                  Row(
-                    children: [
-                      Icon(Icons.error_outline, color: colors.error, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          'Error: ${state.error}',
-                          style: AppTypography.labelMedium.copyWith(
-                            color: colors.error,
-                          ),
-                        ),
-                      ),
-                    ],
+                  AiErrorCard(
+                    error: state.error ?? 'Unknown error',
+                    provider: settings.provider,
                   ),
                 ] else if (state.phase == TranslatorRunPhase.cancelled) ...[
                   Row(
                     children: [
-                      Icon(Icons.stop_circle_outlined,
-                          color: colors.onSurfaceVariant, size: 20),
+                      Icon(
+                        Icons.stop_circle_outlined,
+                        color: colors.onSurfaceVariant,
+                        size: 20,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         'Cancelled — ${state.translationsSaved} translations '
@@ -327,25 +329,28 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
                         onPressed: state.phase == TranslatorRunPhase.idle
                             ? null
                             : () => ref
-                                .read(translatorRunnerProvider.notifier)
-                                .reset(),
+                                  .read(translatorRunnerProvider.notifier)
+                                  .reset(),
                         icon: const Icon(Icons.refresh),
                         label: const Text('Reset'),
                       ),
                       OutlinedButton.icon(
                         onPressed: _shareDatabase,
-                        icon: Icon(_useDirectoryPicker
-                            ? Icons.save_alt
-                            : Icons.share),
-                        label:
-                            Text(_useDirectoryPicker ? 'Save DB…' : 'Share DB'),
+                        icon: Icon(
+                          _useDirectoryPicker ? Icons.save_alt : Icons.share,
+                        ),
+                        label: Text(
+                          _useDirectoryPicker ? 'Save DB…' : 'Share DB',
+                        ),
                       ),
                       OutlinedButton.icon(
                         onPressed: _shareLastExchange,
                         icon: const Icon(Icons.swap_vert),
-                        label: Text(_useDirectoryPicker
-                            ? 'Save prompt & response…'
-                            : 'Share prompt & response'),
+                        label: Text(
+                          _useDirectoryPicker
+                              ? 'Save prompt & response…'
+                              : 'Share prompt & response',
+                        ),
                       ),
                     ],
                   ],
@@ -406,8 +411,10 @@ class _TranslatorRunScreenState extends ConsumerState<TranslatorRunScreen> {
     final bookName = state.currentBookIndex < settings.bookIds.length
         ? settings.bookIds[state.currentBookIndex]
         : '';
-    final sb = StringBuffer('Book ${state.currentBookIndex + 1}/'
-        '${state.totalBooks}');
+    final sb = StringBuffer(
+      'Book ${state.currentBookIndex + 1}/'
+      '${state.totalBooks}',
+    );
     if (bookName.isNotEmpty) sb.write(' ($bookName)');
     if (state.totalSections > 0) {
       sb.write(' · section ${state.currentSection}/${state.totalSections}');
@@ -501,7 +508,8 @@ class _RunStatsGrid extends StatelessWidget {
               child: cell(
                 icon: Icons.view_agenda_outlined,
                 label: 'This chunk',
-                value: '${state.currentChunkSentences} sent'
+                value:
+                    '${state.currentChunkSentences} sent'
                     '${state.currentChunkTokens > 0 ? ' · ~${state.currentChunkTokens} tok' : ''}',
               ),
             ),

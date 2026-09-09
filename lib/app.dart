@@ -22,6 +22,7 @@ import 'features/changelog/changelog_service.dart';
 import 'features/update/app_update_dialog.dart';
 import 'features/update/app_update_service.dart';
 import 'features/deep_links/deep_link_service.dart';
+import 'features/mcp/widgets/mcp_autostart.dart';
 import 'features/indexing/index_gate.dart';
 import 'features/settings/services/tts_audio_handler.dart';
 import 'router/app_router.dart';
@@ -235,7 +236,8 @@ class _EpitakaAppState extends ConsumerState<EpitakaApp> {
     );
 
     return SyncLifecycleObserver(
-      child: AudioServiceInitializer(
+      child: McpAutoStart(
+        child: AudioServiceInitializer(
         child: _KeepAwakeBinder(
           child: Consumer(
             builder: (context, ref, _) {
@@ -272,6 +274,7 @@ class _EpitakaAppState extends ConsumerState<EpitakaApp> {
               );
             },
           ),
+        ),
         ),
       ),
     );

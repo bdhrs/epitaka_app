@@ -2,6 +2,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/database/app_database.dart';
+import '../settings/services/download_foreground_service.dart';
+import '../settings/services/download_notification_service.dart';
 import 'index_service.dart';
 import 'index_state.dart';
 
@@ -20,8 +22,8 @@ final indexServiceProvider = Provider<IndexService>((ref) => IndexService(ref));
 /// search against an incomplete index.
 final indexControllerProvider =
     StateNotifierProvider<IndexController, IndexState>((ref) {
-  return IndexController(ref);
-});
+      return IndexController(ref);
+    });
 
 class IndexController extends StateNotifier<IndexState> {
   final Ref _ref;
@@ -96,18 +98,43 @@ class IndexController extends StateNotifier<IndexState> {
 
   Future<void> _buildIndexInternal() async {
     state = IndexState.building(progress: 0, status: 'Preparing…');
+    final fgsActive = await _startIndexKeepAlive();
+    var lastPct = -1;
+    var lastNotif = DateTime.fromMillisecondsSinceEpoch(0);
+    void report(double p, String msg) {
+      state = IndexState.building(progress: p, status: msg);
+      final pct = (p * 100).round().clamp(0, 100);
+      final now = DateTime.now();
+      if (pct == lastPct ||
+          now.difference(lastNotif) < const Duration(seconds: 1)) {
+        return;
+      }
+      lastPct = pct;
+      lastNotif = now;
+      final text = msg.isEmpty ? '$pct%' : '$pct% · $msg';
+      if (fgsActive) {
+        DownloadForegroundService.instance.updateIndex(
+          title: 'Building search index',
+          text: text,
+        );
+      } else {
+        DownloadNotificationService.instance.showIndexProgress(
+          title: 'Building search index',
+          body: text,
+          progress: p.clamp(0.0, 1.0),
+        );
+      }
+    }
+
     try {
       final status = _lastStatus ?? await _service.checkStatus();
       if (status.isComplete) {
+        await _stopIndexKeepAlive(fgsActive, done: true);
         state = IndexState.ready();
         return;
       }
 
-      final result = await _service.build(
-        status,
-        onProgress: (p, msg) =>
-            state = IndexState.building(progress: p, status: msg),
-      );
+      final result = await _service.build(status, onProgress: report);
 
       if (result.pendingLanguages.isNotEmpty) {
         debugPrint(
@@ -116,12 +143,66 @@ class IndexController extends StateNotifier<IndexState> {
         );
       }
       _lastStatus = null; // force a fresh checkStatus() next time
+      await _stopIndexKeepAlive(fgsActive, done: true);
       state = IndexState.ready();
     } on AppDatabaseCorruptedException catch (e) {
+      await _stopIndexKeepAlive(fgsActive, error: e.toString());
       state = IndexState.corrupted('app_data.db could not be opened: $e');
     } catch (e) {
       debugPrint('[INDEX] controller: build failed: $e');
+      await _stopIndexKeepAlive(fgsActive, error: e.toString());
       state = IndexState.failed('$e');
+    }
+  }
+
+  /// Start the Android foreground service so the index build survives
+  /// backgrounding, mirroring downloads and translator runs. Returns whether
+  /// the service notification is active (else the caller uses the plain
+  /// local-notification fallback). Never throws.
+  Future<bool> _startIndexKeepAlive() async {
+    try {
+      final active = await DownloadForegroundService.instance.showIndex(
+        title: 'Building search index',
+        text: 'Preparing…',
+      );
+      if (!active) {
+        DownloadNotificationService.instance.showIndexProgress(
+          title: 'Building search index',
+          body: 'Preparing…',
+          progress: 0,
+          isIndeterminate: true,
+        );
+      }
+      return active;
+    } catch (e) {
+      debugPrint('[INDEX] foreground service start failed: $e');
+      return false;
+    }
+  }
+
+  /// Stop the keep-alive and surface the outcome. Never throws.
+  Future<void> _stopIndexKeepAlive(
+    bool fgsActive, {
+    bool done = false,
+    String? error,
+  }) async {
+    try {
+      await DownloadForegroundService.instance.hideIndex();
+      if (error != null) {
+        DownloadNotificationService.instance.showIndexError(
+          'Search index failed',
+          error,
+        );
+      } else if (done) {
+        DownloadNotificationService.instance.showIndexComplete(
+          'Search index ready',
+          'Index built successfully.',
+        );
+      } else {
+        DownloadNotificationService.instance.dismissIndex();
+      }
+    } catch (e) {
+      debugPrint('[INDEX] foreground service stop failed: $e');
     }
   }
 

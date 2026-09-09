@@ -8,13 +8,17 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:markdown/markdown.dart' as md;
+
+import '../../core/providers/settings_provider.dart';
 
 /// Custom inline syntax that matches [book_id:para_id:line_id] and
 /// [book_id:para_id:line_from-line_to] citations.
 /// Range separator can be either a hyphen (-) or an en-dash (–).
 class CitationInlineSyntax extends md.InlineSyntax {
-  CitationInlineSyntax() : super(r'\[([a-zA-Z0-9_.-]+):(\d+):(\d+)(?:[-\u2013](\d+))?\]');
+  CitationInlineSyntax()
+    : super(r'\[([a-zA-Z0-9_.-]+):(\d+):(\d+)(?:[-\u2013](\d+))?\]');
 
   @override
   bool onMatch(md.InlineParser parser, Match match) {
@@ -35,7 +39,7 @@ class CitationInlineSyntax extends md.InlineSyntax {
 /// citations ([book:para:line] and [book:para:line_from-line_to]).
 class CitationMarkdownBuilder extends MarkdownElementBuilder {
   final void Function(String bookId, int paraId, int lineId, {int? lineIdTo})
-      onCitationTap;
+  onCitationTap;
 
   CitationMarkdownBuilder({required this.onCitationTap});
 
@@ -99,12 +103,15 @@ class CitationMarkdownBuilder extends MarkdownElementBuilder {
 /// Renders [data] as markdown with [book:para:line] (and range) citations
 /// turned into tappable chips ([onCitationTap]). Wrapped in a
 /// [SelectionArea] so the reader can copy passages.
-class AiMarkdownView extends StatelessWidget {
+///
+/// Type sizes follow the Pāli font-size setting, so study guides and
+/// Vīmaṃsā answers grow/shrink together with the reader's Pāli text.
+class AiMarkdownView extends ConsumerWidget {
   final String data;
 
   /// Called when a citation chip is tapped.
   final void Function(String bookId, int paraId, int lineId, {int? lineIdTo})
-      onCitationTap;
+  onCitationTap;
 
   const AiMarkdownView({
     super.key,
@@ -113,8 +120,11 @@ class AiMarkdownView extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).colorScheme;
+    final baseFontSize = ref.watch(
+      settingsProvider.select((s) => s.typography.pali.fontSize),
+    );
     final inlineSyntaxes = <md.InlineSyntax>[CitationInlineSyntax()];
 
     return SelectionArea(
@@ -130,7 +140,7 @@ class AiMarkdownView extends StatelessWidget {
         builders: {
           'citation': CitationMarkdownBuilder(onCitationTap: onCitationTap),
         },
-        styleSheet: markdownStyleSheet(colors),
+        styleSheet: markdownStyleSheet(colors, baseFontSize: baseFontSize),
         onTapLink: (text, href, title) {
           // Regular links (if any) are handled by the caller if needed.
         },
@@ -141,55 +151,64 @@ class AiMarkdownView extends StatelessWidget {
 
 /// The markdown theme shared by every AI-markdown surface so study guides
 /// and chat answers look identical.
-MarkdownStyleSheet markdownStyleSheet(ColorScheme colors) {
+///
+/// [baseFontSize] anchors the body size (defaults to the old fixed 15);
+/// callers pass the Pāli font-size setting so markdown scales with it.
+MarkdownStyleSheet markdownStyleSheet(
+  ColorScheme colors, {
+  double baseFontSize = 15,
+}) {
   return MarkdownStyleSheet(
-    p: TextStyle(color: colors.onSurface, fontSize: 15, height: 1.6),
+    p: TextStyle(color: colors.onSurface, fontSize: baseFontSize, height: 1.6),
     h1: TextStyle(
       color: colors.onSurface,
-      fontSize: 20,
+      fontSize: baseFontSize + 5,
       fontWeight: FontWeight.bold,
       height: 1.4,
     ),
     h2: TextStyle(
       color: colors.onSurface,
-      fontSize: 18,
+      fontSize: baseFontSize + 3,
       fontWeight: FontWeight.bold,
       height: 1.4,
     ),
     h3: TextStyle(
       color: colors.onSurface,
-      fontSize: 16,
+      fontSize: baseFontSize + 1,
       fontWeight: FontWeight.w600,
       height: 1.4,
     ),
     strong: TextStyle(
       color: colors.onSurface,
       fontWeight: FontWeight.bold,
-      fontSize: 15,
+      fontSize: baseFontSize,
       height: 1.6,
     ),
     em: TextStyle(
       color: colors.onSurface,
       fontStyle: FontStyle.italic,
-      fontSize: 15,
+      fontSize: baseFontSize,
       height: 1.6,
     ),
     blockquoteDecoration: BoxDecoration(
       border: Border(
-        left: BorderSide(color: colors.primary.withValues(alpha: 0.4), width: 3),
+        left: BorderSide(
+          color: colors.primary.withValues(alpha: 0.4),
+          width: 3,
+        ),
       ),
       color: colors.surfaceContainerHighest.withValues(alpha: 0.15),
     ),
     blockquotePadding: const EdgeInsets.fromLTRB(12, 4, 12, 4),
     blockquote: TextStyle(
       color: colors.onSurfaceVariant,
-      fontSize: 14,
+      fontSize: baseFontSize - 1,
       height: 1.5,
       fontStyle: FontStyle.italic,
     ),
     code: TextStyle(
       color: colors.primary,
-      fontSize: 13,
+      fontSize: baseFontSize - 2,
       fontFamily: 'monospace',
       backgroundColor: colors.surfaceContainerHighest.withValues(alpha: 0.3),
     ),
@@ -198,7 +217,7 @@ MarkdownStyleSheet markdownStyleSheet(ColorScheme colors) {
       borderRadius: BorderRadius.circular(8),
     ),
     codeblockPadding: const EdgeInsets.all(12),
-    listBullet: TextStyle(color: colors.primary, fontSize: 15),
+    listBullet: TextStyle(color: colors.primary, fontSize: baseFontSize),
     a: TextStyle(color: colors.primary, decoration: TextDecoration.underline),
     horizontalRuleDecoration: BoxDecoration(
       border: Border(

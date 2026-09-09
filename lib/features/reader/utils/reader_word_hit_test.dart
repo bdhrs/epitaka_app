@@ -4,12 +4,22 @@ import 'package:flutter/widgets.dart' show GlobalKey;
 import '../../../core/utils/pali_script_converter.dart';
 
 /// Cleans a raw Pāli word by removing non-word characters.
+///
+/// Unicode-aware: keeps every letter / combining mark / number from any
+/// language (Pāli diacritics, Vietnamese đ ư ơ, etc.), so the same cleaner
+/// is safe for both Pāli and translation words.
 String cleanPali(String text) {
   return text
-      .replaceAll(
-        RegExp(r"[^\wāīūōṅñṭḍṇḷṃĀĪŪŌṄÑṬḌṆḶṀ\s]"),
-        '',
-      )
+      .replaceAll(RegExp(r'[^\p{L}\p{M}\p{Nd}_\s]', unicode: true), '')
+      .trim();
+}
+
+/// Cleans a raw translation word (any language) by stripping surrounding
+/// punctuation while preserving all Unicode letters, combining marks and
+/// numbers inside the word (e.g. Vietnamese "được" stays intact).
+String cleanTranslationWord(String text) {
+  return text
+      .replaceAll(RegExp(r'[^\p{L}\p{M}\p{Nd}_\s]', unicode: true), '')
       .trim();
 }
 
@@ -171,9 +181,13 @@ ReaderWordHitResult? hitTestWordAt(
   if (range.isCollapsed) return null;
 
   final rawWord = fullText.substring(range.start, range.end);
-  // Convert from any Pali script to Roman for dictionary lookup.
-  final romanWord = convertToRomanPali(rawWord);
-  final cleaned = cleanPali(romanWord);
+  final isTranslation = lineMetadata?.segment == 'translation';
+  // Translation words (Vietnamese, English, …) must NOT go through Pāli
+  // script conversion or Pāli-only filtering — clean them with the
+  // language-agnostic cleaner so diacritics survive.
+  final cleaned = isTranslation
+      ? cleanTranslationWord(rawWord)
+      : cleanPali(convertToRomanPali(rawWord));
   if (cleaned.isEmpty) return null;
 
   return ReaderWordHitResult(

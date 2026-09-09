@@ -6,6 +6,8 @@
 	<true/>
 	<key>com.apple.security.network.client</key>
 	<true/>
+	<key>com.apple.security.network.server</key>
+	<true/>
 	<!-- Directory picker (Translation Builder "Save DB…"): sandboxed apps
 	     need user-selected read-write access to write where the user picks. -->
 	<key>com.apple.security.files.user-selected.read-write</key>

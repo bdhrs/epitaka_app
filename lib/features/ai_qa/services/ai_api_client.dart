@@ -15,8 +15,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:http/http.dart' as http;
 
 import '../../shared/models/ai_provider.dart';
+import '../../shared/models/ai_api_error.dart' as api_err;
 import '../models/ai_qa_models.dart';
 import 'ai_qa_tool_service.dart';
+import '../../mcp/epitaka_tool_registry.dart';
 
 /// Gemini default base URL.
 const String kGeminiBaseUrl =
@@ -41,308 +43,10 @@ const int kTranslatorMaxOutputTokens = 65000;
 
 /// Shared function declarations (tools) for AI tool calling.
 ///
-/// Used by both Vīmaṃsā and Gavesana so the model can decide how to search
-/// the Tipitaka using the same local database tools.
-final List<Map<String, dynamic>> kAiToolDeclarations = [
-  {
-    'name': 'search_tipitaka',
-    'description':
-        'Search the Tipitaka database for relevant passages using full-text search. '
-        'Use this when you need to find passages related to a specific topic, term, '
-        'or concept in the Pāli Canon.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'query': {
-          'type': 'STRING',
-          'description':
-              'Search query — a phrase or keywords to search for in the Pāli text.',
-        },
-      },
-      'required': ['query'],
-    },
-  },
-  {
-    'name': 'search_tipitaka_batch',
-    'description':
-        'Search the Tipitaka using MULTIPLE different search terms in one call. '
-        'Use this to search for a concept using several synonyms or related terms '
-        'simultaneously. All queries are executed in parallel for speed.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'queries': {
-          'type': 'ARRAY',
-          'description':
-              'Array of search queries to run in parallel. '
-              'Include different phrasings, synonyms, and related terms '
-              'to maximize coverage.',
-          'items': {'type': 'STRING'},
-          'minItems': 2,
-          'maxItems': 5,
-        },
-      },
-      'required': ['queries'],
-    },
-  },
-  {
-    'name': 'search_by_category',
-    'description':
-        'Search the Tipitaka within specific book categories or nikayas. '
-        'Use this when you know which part of the canon the answer is likely in. '
-        'Categories: "vinaya", "sutta", "abhidhamma". '
-        'Nikaya prefixes: "dn", "mn", "sn", "an", "khp", "dhp", "ud", "it", "snp", '
-        '"vv", "pv", "thag", "thig", "ja", "bi", "patis", "nm", "ne", "pk". '
-        'Combine with queries to find specific passages within those books.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'queries': {
-          'type': 'ARRAY',
-          'description':
-              'Array of search queries. Include 2-3 specific terms '
-              '(Pāli keywords, English phrases) to find within the target books.',
-          'items': {'type': 'STRING'},
-          'minItems': 2,
-          'maxItems': 5,
-        },
-        'categories': {
-          'type': 'ARRAY',
-          'description':
-              'Book categories to search within. '
-              'Choose from: "vinaya", "sutta", or "abhidhamma". '
-              'Can be combined with nikayas. Leave empty to search all categories.',
-          'items': {'type': 'STRING'},
-        },
-        'nikayas': {
-          'type': 'ARRAY',
-          'description':
-              'Nikāya book prefixes to narrow the search further. '
-              'E.g. ["dn"] for Dīgha Nikāya, ["an"] for Aṅguttara Nikāya, '
-              '["dhp"] for Dhammapada. Can be combined with categories.',
-          'items': {'type': 'STRING'},
-        },
-      },
-      'required': ['queries', 'categories'],
-    },
-  },
-  {
-    'name': 'search_sections',
-    'description':
-        'Search section/sutta TITLES (with short summaries) across the whole canon. '
-        'Use this FIRST for concept questions to discover WHICH suttas discuss '
-        'a topic, then open them with get_paragraph_content or drill in with get_section.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'query': {
-          'type': 'STRING',
-          'description':
-              'Term or phrase to match against section/sutta titles or summaries (Pāli or English).',
-        },
-      },
-      'required': ['query'],
-    },
-  },
-  {
-    'name': 'get_section',
-    'description':
-        'Get ONE section (vagga/sutta/chapter) with its summary, its direct '
-        'child sections, and its parent section. Use this to BROWSE down the '
-        'canon hierarchy (vagga → sutta) after search_sections, instead of '
-        'dumping a whole book\'s headings.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'book_id': {
-          'type': 'STRING',
-          'description': 'Book ID (e.g. "D-i", "S-iii", "M-iii", "Dhp").',
-        },
-        'para_start': {
-          'type': 'INTEGER',
-          'description':
-              'The section\'s starting paragraph (para_start from a search_sections result).',
-        },
-      },
-      'required': ['book_id', 'para_start'],
-    },
-  },
-  {
-    'name': 'get_dictionary',
-    'description':
-        'Get the definition, inflections and canon occurrences for a single '
-        'Pāli term. Canon occurrences show the actual sentences where the term '
-        'appears in the Tipitaka (with translation and context). Use this '
-        'BEFORE searching the canon when the question is about the meaning of '
-        'a Pāli term. When you need SEVERAL terms, use get_dictionary_batch '
-        'instead — one call per term costs an extra API round-trip.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'term': {
-          'type': 'STRING',
-          'description': 'Pāli term to look up (e.g. "saṅkhāra").',
-        },
-      },
-      'required': ['term'],
-    },
-  },
-  {
-    'name': 'get_dictionary_batch',
-    'description':
-        'Look up definitions and canon occurrences for MULTIPLE Pāli terms in '
-        'ONE call. Use this instead of calling get_dictionary repeatedly when '
-        'you need to explain several terms (e.g. the key words of a sutta) — '
-        'all lookups run in parallel for speed and save API round-trips.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'terms': {
-          'type': 'ARRAY',
-          'description':
-              'Array of Pāli terms to look up, e.g. ["sīla", "samādhi", "paññā", "vimutti"].',
-          'items': {'type': 'STRING'},
-          'minItems': 2,
-          'maxItems': 5,
-        },
-      },
-      'required': ['terms'],
-    },
-  },
-  {
-    'name': 'get_headings',
-    'description':
-        'Get the table of contents / section headings for a specific book. '
-        'Use this to understand the structure of a book, find specific sections, '
-        'or navigate to a particular topic within a book.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'book_id': {
-          'type': 'STRING',
-          'description':
-              'Book ID (e.g. "dn1", "mn141", "sn12.2", "an3.1", "dhp").',
-        },
-      },
-      'required': ['book_id'],
-    },
-  },
-  {
-    'name': 'get_books',
-    'description':
-        'Get a list of all available books in the Tipitaka database. '
-        'Use this when you need to know which books are available, their categories, '
-        'or to find the correct book_id for a specific text.',
-    'parameters': {'type': 'OBJECT', 'properties': {}},
-  },
-  {
-    'name': 'get_paragraph_content',
-    'description':
-        'Get the full Pāli content of a range of paragraphs from a specific book. '
-        'Use this to read the actual text of a passage after you have identified '
-        'the relevant book and paragraph range (e.g. from search results or headings).',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'book_id': {
-          'type': 'STRING',
-          'description': 'Book ID (e.g. "dn1", "mn141").',
-        },
-        'para_start': {
-          'type': 'INTEGER',
-          'description': 'Starting paragraph number (inclusive).',
-        },
-        'para_end': {
-          'type': 'INTEGER',
-          'description':
-              'Ending paragraph number (inclusive). Can be the same as para_start for a single paragraph.',
-        },
-      },
-      'required': ['book_id', 'para_start', 'para_end'],
-    },
-  },
-  {
-    'name': 'get_paragraph_content_batch',
-    'description':
-        'Get Pāli content from MULTIPLE book/paragraph ranges in ONE call. '
-        'Use this to read several passages at once after you have identified '
-        'the relevant locations (e.g. from search results or headings). '
-        'All ranges are fetched in parallel for speed.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'ranges': {
-          'type': 'ARRAY',
-          'description':
-              'Array of paragraph ranges to fetch. Each range is an object '
-              'with book_id, para_start, para_end.',
-          'items': {
-            'type': 'OBJECT',
-            'properties': {
-              'book_id': {
-                'type': 'STRING',
-                'description': 'Book ID (e.g. "dn1", "mn141").',
-              },
-              'para_start': {
-                'type': 'INTEGER',
-                'description': 'Starting paragraph number (inclusive).',
-              },
-              'para_end': {
-                'type': 'INTEGER',
-                'description': 'Ending paragraph number (inclusive).',
-              },
-            },
-            'required': ['book_id', 'para_start', 'para_end'],
-          },
-          'minItems': 2,
-          'maxItems': 10,
-        },
-      },
-      'required': ['ranges'],
-    },
-  },
-  {
-    'name': 'get_commentaries',
-    'description':
-        'Get related commentary (Aṭṭhakathā) and sub-commentary (Ṭīkā) passages '
-        'for a given Mūla (root text) paragraph. Use this when a user asks about '
-        'commentarial explanations of a specific passage in the Tipitaka.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'mula_book_id': {
-          'type': 'STRING',
-          'description':
-              'Book ID of the Mūla (root) text (e.g. "dn1", "mn141").',
-        },
-        'mula_para_id': {
-          'type': 'INTEGER',
-          'description':
-              'Paragraph number in the Mūla text to find commentaries for.',
-        },
-      },
-      'required': ['mula_book_id', 'mula_para_id'],
-    },
-  },
-  {
-    'name': 'final_answer',
-    'description':
-        'Call this when you have collected all the information needed to answer the user\'s question. '
-        'The results will be passed to a more capable model to write the final answer. '
-        'Use the args to summarize what you found.',
-    'parameters': {
-      'type': 'OBJECT',
-      'properties': {
-        'summary': {
-          'type': 'STRING',
-          'description':
-              'Brief summary of what you found and what sources you collected.',
-        },
-      },
-      'required': ['summary'],
-    },
-  },
-];
+/// Derived from [kEpitakaTools] (`features/mcp/epitaka_tool_registry.dart`),
+/// the single source of truth shared by Vīmaṃsā/Gavesana and the MCP
+/// server — add new tools there and both surfaces pick them up.
+final List<Map<String, dynamic>> kAiToolDeclarations = geminiToolDeclarations();
 
 /// Default system prompt for the Vīmaṃsā tool model (chat + Q&A).
 const String kAiDefaultToolSystemPrompt =
@@ -519,6 +223,7 @@ class AiApiClient {
     required String apiKey,
     required String toolModel,
     String logTag = 'AI',
+    Future<void>? cancelSignal,
   }) async {
     final payload = buildToolPayload(
       provider: provider,
@@ -541,6 +246,7 @@ class AiApiClient {
           apiKey: apiKey,
           payload: payload,
           logTag: logTag,
+          cancelSignal: cancelSignal,
         );
         return jsonDecode(response) as Map<String, dynamic>;
       case AiProvider.openai:
@@ -553,6 +259,7 @@ class AiApiClient {
           baseUrl: baseUrl.isNotEmpty ? baseUrl : provider.defaultBaseUrl,
           payload: {...payload, 'model': toolModel},
           logTag: logTag,
+          cancelSignal: cancelSignal,
         );
         return jsonDecode(response) as Map<String, dynamic>;
     }
@@ -646,6 +353,14 @@ class AiApiClient {
 
   /// Race [operation] against [cancelSignal]: whichever completes first
   /// wins. A completed cancel signal throws [AiCallCancelledException].
+  /// Public so the tool loop can race local DB tool execution too.
+  static Future<T> raceAiCancel<T>(
+    Future<T> operation,
+    Future<void>? cancelSignal,
+  ) {
+    return _raceCancel(operation, cancelSignal);
+  }
+
   static Future<T> _raceCancel<T>(
     Future<T> operation,
     Future<void>? cancelSignal,
@@ -1039,58 +754,14 @@ class AiApiClient {
     }
   }
 
+  static api_err.AiApiErrorInfo describeError(
+    Object error, {
+    AiProvider? provider,
+  }) => api_err.describeAiError(error, provider: provider);
+
   /// Translate raw errors into a friendly, actionable message for the user.
-  static String friendlyErrorMessage(Object error) {
-    final raw = error.toString();
-    final lower = raw.toLowerCase();
-
-    final statusMatch = RegExp(r'API error (\d+)').firstMatch(raw);
-    if (statusMatch != null) {
-      switch (statusMatch.group(1)) {
-        case '400':
-          final detail = raw.contains(': ')
-              ? raw.substring(raw.indexOf(': ') + 2).trim()
-              : '';
-          return detail.isNotEmpty
-              ? 'The AI service rejected the request (400): $detail'
-              : 'The AI service rejected the request (400). Check the model, '
-                    'endpoint, and request format.';
-        case '401':
-        case '403':
-          return 'Your API key was rejected (${statusMatch.group(1)}). '
-              'Please check the API key in Settings.';
-        case '404':
-          return 'Model not found (404). The selected model may have been '
-              'renamed or is unavailable — update the model in Settings.';
-        case '429':
-          return 'Rate limit exceeded (429). Please wait a moment and try again.';
-        case '500':
-        case '502':
-        case '503':
-          return 'The AI service is temporarily unavailable '
-              '(${statusMatch.group(1)}). Please try again shortly.';
-        default:
-          return 'The AI service returned an error '
-              '(${statusMatch.group(1)}). Please try again.';
-      }
-    }
-
-    if (lower.contains('socketexception') ||
-        lower.contains('connection refused') ||
-        lower.contains('connection reset') ||
-        lower.contains('failed host lookup') ||
-        lower.contains('unable to connect')) {
-      return 'Could not reach the AI service. Check your internet connection '
-          'and try again.';
-    }
-    if (lower.contains('timeout')) {
-      return 'The AI service took too long to respond. Please try again.';
-    }
-    if (lower.contains('rate limit')) {
-      return 'Rate limit exceeded. Please wait a moment and try again.';
-    }
-
-    return raw;
+  static String friendlyErrorMessage(Object error, {AiProvider? provider}) {
+    return describeError(error, provider: provider).displayMessage;
   }
 }
 
@@ -1221,39 +892,7 @@ Future<ToolResult> executeAiTool(
   Map<String, dynamic> args,
 ) async {
   final service = ref.read(aiQaToolServiceProvider);
-
-  switch (name) {
-    case 'search_tipitaka':
-      return service.searchTipitaka(args);
-    case 'search_tipitaka_batch':
-      return service.searchTipitakaBatch(args);
-    case 'search_by_category':
-      return service.searchByCategory(args);
-    case 'search_sections':
-      return service.searchSections(args);
-    case 'get_section':
-      return service.getSection(args);
-    case 'get_dictionary':
-      return service.getDictionary(args);
-    case 'get_dictionary_batch':
-      return service.getDictionaryBatch(args);
-    case 'get_headings':
-      return service.getHeadings(args);
-    case 'get_books':
-      return service.getBooks(args);
-    case 'get_paragraph_content':
-      return service.getParagraphContent(args);
-    case 'get_paragraph_content_batch':
-      return service.getParagraphContentBatch(args);
-    case 'get_commentaries':
-      return service.getCommentaries(args);
-    default:
-      return ToolResult(
-        success: false,
-        data: '{}',
-        errorMessage: 'Unknown tool: $name',
-      );
-  }
+  return dispatchTool(service, name, args);
 }
 
 /// Run the tool-calling loop: repeatedly call the tool model, execute any
@@ -1274,6 +913,7 @@ Future<AiToolLoopResult> runAiToolLoop({
   void Function(List<ToolCallLog> logs)? onToolUpdate,
   int maxIterations = 8,
   String logTag = 'AI',
+  Future<void>? cancelSignal,
 }) async {
   final conversation = [...initialConversation];
   final allToolResults = <Map<String, dynamic>>[];
@@ -1295,6 +935,7 @@ Future<AiToolLoopResult> runAiToolLoop({
       apiKey: settings.apiKey,
       toolModel: settings.toolModel,
       logTag: logTag,
+      cancelSignal: cancelSignal,
     );
 
     final parsed = toolResponse['candidates'] as List<dynamic>?;
@@ -1356,18 +997,21 @@ Future<AiToolLoopResult> runAiToolLoop({
       }
       onToolUpdate?.call([...toolLogs]);
 
-      final results = await Future.wait(
-        callSpecs.map((spec) async {
-          try {
-            return await executeTool(spec.name, spec.args);
-          } catch (e) {
-            return ToolResult(
-              success: false,
-              data: '{}',
-              errorMessage: 'Tool execution error: $e',
-            );
-          }
-        }),
+      final results = await AiApiClient.raceAiCancel(
+        Future.wait(
+          callSpecs.map((spec) async {
+            try {
+              return await executeTool(spec.name, spec.args);
+            } catch (e) {
+              return ToolResult(
+                success: false,
+                data: '{}',
+                errorMessage: 'Tool execution error: $e',
+              );
+            }
+          }),
+        ),
+        cancelSignal,
       );
 
       for (int i = 0; i < callSpecs.length; i++) {

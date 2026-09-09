@@ -33,7 +33,8 @@ import '../../reader/providers/reader_provider.dart';
 import '../../reader/providers/reader_tabs_provider.dart';
 import '../../reader/widgets/translation_remark_dialog.dart';
 import '../utils/reader_quote_utils.dart' show buildCitationFromTemplate;
-import '../utils/reader_word_hit_test.dart' show cleanPali, selectWordAt;
+import '../utils/reader_word_hit_test.dart'
+    show cleanTranslationWord, selectWordAt;
 import '../widgets/reader_context_menu.dart'
     show ContextMenuButton, FullWidthSelectionToolbar;
 
@@ -682,12 +683,13 @@ class ReaderCopyService {
     return _extractLookupWord(lastSelectedContent);
   }
 
-  /// Extract the first Pāli word from the selected text for dictionary lookup.
+  /// Extract the first word from the selected text for dictionary lookup.
   /// Returns null if no suitable word is found.
   ///
-  /// The word is normalized like the double-tap lookup: any Pāli script is
-  /// converted to Roman and non-word punctuation is stripped, so a lookup
-  /// works even when the reader displays non-Roman scripts.
+  /// Language-agnostic: Pāli script conversion is a no-op for Latin text,
+  /// and the Unicode-aware cleaner preserves diacritics of any language
+  /// (e.g. Vietnamese "được"), so the same path works for Pāli and
+  /// translation selections.
   static String? _extractLookupWord(SelectedContent? lastSelectedContent) {
     if (lastSelectedContent == null) return null;
     final raw = lastSelectedContent.plainText.trim();
@@ -697,7 +699,7 @@ class ReaderCopyService {
         .split(RegExp(r'\s+'))
         .firstWhere((w) => w.isNotEmpty, orElse: () => '');
     if (word.isEmpty) return null;
-    final cleaned = cleanPali(convertToRomanPali(word));
+    final cleaned = cleanTranslationWord(convertToRomanPali(word));
     if (cleaned.isEmpty || cleaned.length < 2 || cleaned.length > 50) {
       return null;
     }

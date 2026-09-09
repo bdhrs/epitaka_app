@@ -304,9 +304,7 @@ class _DpdHeadwordCardState extends ConsumerState<DpdHeadwordCard> {
                   border: Border.all(
                     color: colors.outlineVariant.withValues(alpha: 0.55),
                   ),
-                  borderRadius: BorderRadius.circular(
-                    AppDimensions.radiusMd,
-                  ),
+                  borderRadius: BorderRadius.circular(AppDimensions.radiusMd),
                 )
               : null,
           child: Column(
@@ -314,10 +312,7 @@ class _DpdHeadwordCardState extends ConsumerState<DpdHeadwordCard> {
             children: [
               // Lemma heading — tappable to expand/collapse meaning.
               Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -346,7 +341,7 @@ class _DpdHeadwordCardState extends ConsumerState<DpdHeadwordCard> {
               // Short meaning preview — shown only when collapsed.
               if (hasMeaning && !_expanded)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
                   child: Text(
                     _shortMeaning(widget.meaningHtml!),
                     maxLines: 2,
@@ -362,7 +357,7 @@ class _DpdHeadwordCardState extends ConsumerState<DpdHeadwordCard> {
               // Detail meaning — shown only when expanded.
               if (hasMeaning && _expanded)
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(10, 0, 10, 8),
+                  padding: const EdgeInsets.fromLTRB(8, 0, 8, 6),
                   child: DpdHtmlRichText(
                     html: _stripDetailsTags(widget.meaningHtml!),
                     baseStyle: TextStyle(

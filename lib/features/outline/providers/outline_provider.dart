@@ -1,6 +1,12 @@
-/// Builds the grouped outline of a book from the local `headings` table.
+/// Builds the grouped outline of a book.
 ///
-/// Mirrors the web outline page (epitaka.org `_book_outline_items`):
+/// Preferred source is the translated `summaries` table in `epitaka_en.db`
+/// (offline): each row already carries `vagga_title` → `sutta_title` →
+/// English `title`, so level-10 sections show their translated title text
+/// instead of the bare Pāli heading number ("1", "2", …).
+///
+/// Fallback is the local `headings` table in `epitaka.db`, mirroring the web
+/// outline page (epitaka.org `_book_outline_items`):
 /// - Books normally have numbered (level-10) sections; those are the items.
 /// - Books without level-10 sections (grammars, anthologies, saṅgāyana
 ///   summaries) fall back to their level 2–6 headings so every book gets a
@@ -11,6 +17,7 @@
 library;
 
 import 'package:drift/drift.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../core/providers/database_provider.dart';
@@ -20,6 +27,103 @@ final outlineProvider = FutureProvider.family<List<OutlineGroup>, String>((
   ref,
   bookId,
 ) async {
+  final fromSummaries = await _loadFromSummaries(ref, bookId);
+  if (fromSummaries != null && fromSummaries.isNotEmpty) {
+    debugPrint(
+      '[OUTLINE] book=$bookId source=summaries groups=${fromSummaries.length}',
+    );
+    return fromSummaries;
+  }
+  debugPrint('[OUTLINE] book=$bookId source=headings (summaries miss)');
+  return _loadFromHeadings(ref, bookId);
+});
+
+/// Load the outline from `summaries` in `epitaka_en.db` when that table
+/// exists and holds rows for [bookId]. Returns null when the English DB is
+/// missing, predates the summaries table, or has no rows for this book so
+/// the caller falls back to `headings`.
+Future<List<OutlineGroup>?> _loadFromSummaries(Ref ref, String bookId) async {
+  try {
+    final enDb = await ref.watch(translationDbProvider('en').future);
+    if (enDb == null) {
+      debugPrint(
+        '[OUTLINE] book=$bookId summaries miss: epitaka_en.db not open (not downloaded?)',
+      );
+      return null;
+    }
+
+    final table = await enDb
+        .customSelect(
+          "SELECT name FROM sqlite_master WHERE type = 'table' "
+          'AND name = ?',
+          variables: [Variable.withString('summaries')],
+        )
+        .get();
+    if (table.isEmpty) {
+      debugPrint(
+        '[OUTLINE] book=$bookId summaries miss: no summaries table (stale epitaka_en.db — re-download English)',
+      );
+      return null;
+    }
+
+    final rows = await enDb
+        .customSelect(
+          'SELECT section_id, para_start, para_end, title, heading_title, '
+          'sutta_title, vagga_title FROM summaries WHERE book_id = ? '
+          'ORDER BY section_id ASC',
+          variables: [Variable.withString(bookId)],
+        )
+        .get();
+    debugPrint('[OUTLINE] book=$bookId summaries rows=${rows.length}');
+    if (rows.isEmpty) {
+      debugPrint('[OUTLINE] book=$bookId summaries miss: 0 rows for this book');
+      return null;
+    }
+
+    final groups = <OutlineGroup>[];
+    OutlineGroup? vagga;
+    OutlineSutta? sutta;
+
+    for (final r in rows) {
+      final vaggaTitle = r.readNullable<String>('vagga_title') ?? '';
+      final suttaTitle = r.readNullable<String>('sutta_title') ?? '';
+      var title = r.readNullable<String>('title') ?? '';
+      if (title.trim().isEmpty) {
+        title =
+            r.readNullable<String>('heading_title') ??
+            '${r.readNullable<int>('section_id') ?? r.read<int>('para_start')}';
+      }
+      final paraStart = r.read<int>('para_start');
+      final paraEnd = r.read<int>('para_end');
+
+      final item = OutlineItem(
+        paraId: paraStart,
+        sectionEnd: paraEnd,
+        title: title,
+        level: 10,
+        translated: true,
+      );
+
+      if (vagga == null || vaggaTitle != vagga.title) {
+        vagga = OutlineGroup(title: vaggaTitle, suttas: []);
+        groups.add(vagga);
+        sutta = null;
+      }
+      if (sutta == null || suttaTitle != sutta.title) {
+        sutta = OutlineSutta(title: suttaTitle, items: []);
+        vagga.suttas.add(sutta);
+      }
+      sutta.items.add(item);
+    }
+
+    return groups;
+  } catch (e) {
+    debugPrint('[OUTLINE] book=$bookId summaries miss: exception $e');
+    return null;
+  }
+}
+
+Future<List<OutlineGroup>> _loadFromHeadings(Ref ref, String bookId) async {
   final db = await ref.watch(epitakaDbProvider.future);
 
   final rows =
@@ -116,4 +220,4 @@ final outlineProvider = FutureProvider.family<List<OutlineGroup>, String>((
   }
 
   return groups;
-});
+}

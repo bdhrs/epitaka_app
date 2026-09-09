@@ -8,7 +8,6 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/app_localizations.dart';
 import '../../../router/app_router.dart' show AppRoutes;
-import '../../reader/providers/reader_tabs_provider.dart';
 
 /// The main navigation drawer.
 ///
@@ -115,18 +114,13 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
 
                 _DrawerDivider(colors: colors),
 
-                // ── Group 3: Annotations + Outline ────────────
+                // ── Group 3: Annotations ────────────
                 _DrawerItem(
                   icon: Icons.edit_note,
                   title: loc.annotations,
                   onTap: () =>
                       _closeAndGo(context, '/annotations?fromDrawer=true'),
                   selected: _isRouteActive(context, '/annotations'),
-                ),
-                _DrawerItem(
-                  icon: Icons.account_tree_outlined,
-                  title: loc.outline,
-                  onTap: _openOutline,
                 ),
 
                 _DrawerDivider(colors: colors),
@@ -216,25 +210,6 @@ class _MainDrawerState extends ConsumerState<MainDrawer> {
   void _closeAndGo(BuildContext context, String route) {
     Navigator.of(context).pop(); // close drawer
     context.go(route);
-  }
-
-  /// Open the outline of the book currently open in the reader. When no
-  /// book is open, hint and fall back to the library (where opening a book
-  /// makes the outline reachable from the reader).
-  void _openOutline() {
-    final tab = ref.read(readerTabsProvider).activeTab;
-    Navigator.of(context).pop(); // close drawer
-    if (tab != null) {
-      context.push(
-        '/outline/${tab.bookId}?bookName=${Uri.encodeComponent(tab.bookName)}',
-      );
-      return;
-    }
-    final loc = AppLocalizations.of(context);
-    ScaffoldMessenger.of(
-      context,
-    ).showSnackBar(SnackBar(content: Text(loc.openBookFirst)));
-    context.go(AppRoutes.library);
   }
 
   bool _isRouteActive(BuildContext context, String route) {
@@ -381,11 +356,7 @@ class _DrawerIconButton extends StatelessWidget {
             color: colors.surfaceContainerHighest.withValues(alpha: 0.5),
             borderRadius: BorderRadius.circular(10),
           ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: colors.onSurfaceVariant,
-          ),
+          child: Icon(icon, size: 20, color: colors.onSurfaceVariant),
         ),
       ),
     );

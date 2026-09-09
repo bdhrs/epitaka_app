@@ -65,8 +65,9 @@ class AppLocalizations {
   /// Title of the "What's New" dialog shown after an app update.
   String get whatsNew => _t("What's New");
   String get desktopUpdateAvailable => _t('Desktop update available');
-  String desktopUpdateDescription(String version) =>
-      _t('Version $version is available. Download it from the official GitHub release page.');
+  String desktopUpdateDescription(String version) => _t(
+    'Version $version is available. Download it from the official GitHub release page.',
+  );
   String get downloadUpdate => _t('Download update');
   String get later => _t('Later');
 
@@ -390,6 +391,9 @@ class AppLocalizations {
   String get externalApp => _t('External app');
   String get copy => _t('Copy');
   String get copyDesc => _t('Copy the selected text');
+  String get searchGoogle => _t('Search Google');
+  String get showFullError => _t('Show full error');
+  String get hideFullError => _t('Hide full error');
   String get excerpt => _t('Excerpt');
   String get excerptDesc => _t('Copy with citation');
   String get copyLink => _t('Copy Link');
@@ -524,11 +528,21 @@ class AppLocalizations {
   String get ttsPaliVoice => _t('Pāli voice');
   String get ttsTranslationVoice => _t('Translation voice');
   String get ttsHindiVoiceNotInstalled => _t('Hindi voice not installed');
+
+  /// "X voice not installed" for the Pāli TTS script the user picked
+  /// (Kannada / Telugu / Sinhala / Hindi), instead of always Hindi.
+  String ttsVoiceNotInstalledFor(String scriptLabel) =>
+      '$scriptLabel ${_t('voice not installed')}';
   String get ttsHindiVoiceMissingDesc => _t(
     'A Hindi (Devanagari) voice is needed to read Pāli aloud. '
     'Install one in your device Text-to-Speech settings.',
   );
   String get ttsInstallHindiVoice => _t('Install Hindi voice');
+  String get ttsScriptLabel => _t('Pāli TTS Script');
+  String get ttsScriptDesc => _t(
+    'Choose which script/language to use for reading Pāli aloud. '
+    'Only Hindi (Sanskrit) uses Devanagari conversion with replacement text.',
+  );
   String get ttsPreview => _t('Preview');
   String get translationNote => _t('Translation note');
   String get translationRemark => _t('Translation remark');
@@ -1214,6 +1228,13 @@ class AppLocalizations {
   String get resetNow => _t('Reset Now');
   String get backupSavedTo => _t('Backup saved to: ');
   String get failedToExportData => _t('Failed to export data: ');
+  String get storageLocation => _t('Database folder');
+  String get openFolder => _t('Open folder');
+  String get copyPath => _t('Copy path');
+  String get pathCopied => _t('Path copied to clipboard');
+  String get couldNotOpenFolder => _t('Could not open folder: ');
+  String get loadingDatabases => _t('Loading databases…');
+  String get noDatabasesFound => _t('No databases found.');
 
   String get rebuildSearchIndexTitle => _t('Rebuild Search Index?');
   String get rebuildIndexConfirmDesc => _t(

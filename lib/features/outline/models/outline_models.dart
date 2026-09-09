@@ -10,11 +10,18 @@ class OutlineItem {
   final String title;
   final int level;
 
+  /// True when [title] comes from the translated `summaries` table in
+  /// `epitaka_en.db` (English) rather than the Pāli `headings` table.
+  /// Translated titles must be rendered as plain [Text], never through
+  /// PaliText (script conversion would corrupt English).
+  final bool translated;
+
   const OutlineItem({
     required this.paraId,
     required this.sectionEnd,
     required this.title,
     required this.level,
+    this.translated = false,
   });
 }
 
@@ -33,6 +40,5 @@ class OutlineGroup {
 
   const OutlineGroup({required this.title, required this.suttas});
 
-  int get itemCount =>
-      suttas.fold(0, (sum, s) => sum + s.items.length);
+  int get itemCount => suttas.fold(0, (sum, s) => sum + s.items.length);
 }
